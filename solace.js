@@ -41,7 +41,8 @@ let PRODUCTS = PRODUCT_ALL.map((img, i) => {
   colors: SWATCHES[i % SWATCHES.length],
   img,
   alt: null,
-  sizes: (id === 23 || id === 24) ? ["One Size"] : ["S", "M", "L", "XL"]
+  sizes: (id === 23 || id === 24) ? ["One Size"] : ["S", "M", "L", "XL"],
+  stock: 10 + (id % 7)
   };
 });
 
@@ -144,7 +145,7 @@ function renderGrid() {
         <button class="wish ${wish.includes(p.id) ? "on" : ""}" data-wish="${p.id}" aria-label="Wishlist">${icon("heart")}</button>
         ${imgTag(p.img, p.name)}${p.alt ? `<span class="alt">${imgTag(p.alt, "")}</span>` : ""}
         <button class="qvb" data-qv="${p.id}">Quick View</button></div>
-      <div class="pinfo"><div>${p.name}<div class="sw">${p.colors.map(c => `<i style="background:${c}"></i>`).join("")}</div></div><span>${p.oldPrice ? `<s>${rp(p.oldPrice)}</s> ` : ""}${rp(p.price)}</span></div>
+      <div class="pinfo"><div>${p.name}<div class="sw">${p.colors.map(c => `<i style="background:${c}"></i>`).join("")}</div></div><span>${p.oldPrice ? `<s>${rp(p.oldPrice)}</s> ` : ""}${rp(p.price)}</span>${p.stock === 0 ? `<span class="stock out">Habis</span>` : (p.stock ?? 99) <= 5 ? `<span class="stock low">Sisa ${p.stock}</span>` : ""}</div>
     </article>`).join("");
   $$(".pimg .alt").forEach(a => { a.style.cssText = "position:absolute;inset:0;opacity:0;transition:opacity .7s"; });
   $$(".card").forEach((c, i) => setTimeout(() => c.classList.add("show"), 80 + i * 90));
@@ -169,6 +170,7 @@ function shareProduct(id) {
 }
 function addCart(id, size) {
   const p = PRODUCTS.find(x => x.id === id), s = size || p.sizes[1] || p.sizes[0];
+  if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`);
   const ex = cart.find(c => c.id === id && c.size === s);
   ex ? ex.qty++ : cart.push({ id, size: s, qty: 1 });
   sync(); toast(`${p.name} ditambahkan`); openDrawer("cart");
@@ -323,7 +325,10 @@ async function submitCheckout() {
     const res = await apiPost("/orders.php", { name, phone, city, addr, note, pay, promo: promo || null, user_email: u ? u.email : null, items: cart.map(c => ({ id: c.id, size: c.size, qty: c.qty })) });
     orderId = res.order.id; subtotal = res.order.subtotal; discount = res.order.discount; shipping = res.order.shipping; total = res.order.total;
     apiOnline = true;
-  } catch { apiOnline = false; }
+  } catch (err) {
+    apiOnline = false;
+    if (err && /Stok/i.test(err.message || "")) { $("#coMsg").textContent = err.message; return; } /* stok habis di server: jangan simpan pesanan */
+  }
   setApiStatus();
   const order = { id: orderId, date: new Date().toISOString(), name, phone, city, addr, note, pay,
     items: cart.map(c => ({ id: c.id, size: c.size, qty: c.qty })), subtotal, discount, promo: promo || null, shipping, total };
@@ -333,10 +338,17 @@ async function submitCheckout() {
     localStorage.setItem("sl_orders", JSON.stringify(orders));
   } catch {}
   const usedPromo = promo, usedDiscount = discount;
-  cart = []; promo = null; sync();
+  cart = []; promo = null; sync(); apiLoadProducts(); /* segarkan stok dari database */
   const payNote = pay === "COD" ? "Siapkan uang tunai sebesar " + rp(total) + " saat kurir datang."
     : pay === "Transfer Bank" ? "Detail rekening akan dikirim ke WhatsApp " + phone + "."
     : "Kode QRIS akan dikirim ke WhatsApp " + phone + ".";
+  const waLines = [
+    `Halo 3KA08! Saya ${name}, mau konfirmasi pesanan ${orderId}.`,
+    `Total: ${rp(total)} (${pay})`,
+    ...order.items.map(it => { const p = PRODUCTS.find(x => x.id === it.id); return `• ${it.qty}x ${p ? p.name : "Produk"} (${it.size}) — ${p ? rp(p.price * it.qty) : ""}`; }),
+    `Kirim ke: ${city} — ${addr}`,
+  ];
+  const waUrl = `https://wa.me/${SELLER_WA}?text=${encodeURIComponent(waLines.join("\n"))}`;
   $("#coBox").innerHTML = `
   <div class="co-ok">
     <div class="tick">✓</div>
@@ -345,6 +357,8 @@ async function submitCheckout() {
     <p>Pesanan kamu sudah kami terima dan akan segera diproses. ${payNote}</p>
     <div class="ord">Nomor Pesanan<b>${orderId}</b></div>
     <p>Total yang harus dibayar: <b style="color:#000">${rp(total)}</b> · ${pay}${usedPromo ? `<br>Termasuk diskon ${usedPromo} (−${rp(usedDiscount)})` : ""}<br>Pengiriman ke ${city} — ${addr}</p>
+    <a class="btn" href="${waUrl}" target="_blank" rel="noopener" style="margin-top:16px">Konfirmasi via WhatsApp ${icon("arrow")}</a>
+    <p style="font-size:12px;color:#8a8a86">Klik tombol di atas supaya penjual langsung terima pesananmu di WhatsApp.</p>
     <button class="btn" data-close style="margin-top:24px">Lanjut Belanja ${icon("arrow")}</button>
   </div>`;
   hydrateIcons($("#coBox"));
@@ -352,10 +366,14 @@ async function submitCheckout() {
 }
 
 /* ---------- INFO / ACCOUNT / TRACK ORDER ---------- */
+/* Nomor WhatsApp penjual — GANTI dengan nomor asli toko.
+   Dipakai tombol "Konfirmasi via WhatsApp" setelah checkout dan info kontak. */
+const SELLER_WA = "6281234567890";
+const SELLER_WA_DISPLAY = "0812-3456-7890";
 const INFO_CONTENT = {
   about: ["About Us", "3KA08 adalah brand fashion minimalis dari kelas 3KA08. Kami percaya pakaian yang baik tidak perlu ramai — potongan bersih, bahan berbobot, dan warna monokrom yang gampang dipadukan lintas musim."],
-  contact: ["Contact", "Hubungi kami di WhatsApp 0812-3456-7890 atau email halo@3ka08.id. Jam layanan Senin–Sabtu, 09.00–18.00 WIB."],
-  support: ["Customer Service", "Ada kendala dengan pesananmu? Hubungi Customer Service di WhatsApp 0812-3456-7890 atau email halo@3ka08.id. Sertakan nomor pesananmu supaya kami bisa bantu lebih cepat."],
+  contact: ["Contact", `Hubungi kami di WhatsApp ${SELLER_WA_DISPLAY} atau email halo@3ka08.id. Jam layanan Senin–Sabtu, 09.00–18.00 WIB.`],
+  support: ["Customer Service", `Ada kendala dengan pesananmu? Hubungi Customer Service di WhatsApp ${SELLER_WA_DISPLAY} atau email halo@3ka08.id. Sertakan nomor pesananmu supaya kami bisa bantu lebih cepat.`],
   shipping: ["Shipping & Returns", "Pengiriman 2–4 hari kerja, ongkir Rp15.000 dan gratis untuk belanja di atas Rp750.000. Penukaran atau pengembalian bisa dilakukan dalam 30 hari, selama produk belum dipakai dan tag masih terpasang."],
   instagram: ["Instagram", "Follow 3KA08 di Instagram: @3ka08 — lihat lookbook terbaru, behind the scenes, dan info restock di sana."],
   tiktok: ["TikTok", "Follow 3KA08 di TikTok: @3ka08 — video styling, try-on, dan koleksi terbaru."],
@@ -508,9 +526,10 @@ function openQV(id) {
   const p = PRODUCTS.find(x => x.id === id); qvSize = p.sizes[Math.min(1, p.sizes.length - 1)];
   $("#qvBox").innerHTML = `<div class="pimg">${imgTag(p.img, p.name, false)}</div>
   <div class="qv-i"><small>${p.cat === "acc" ? "Accessories" : p.cat}</small><h3>${p.name}</h3><b>${p.oldPrice ? `<s style="color:#8a8a86;font-weight:400">${rp(p.oldPrice)}</s> ` : ""}${rp(p.price)}</b>
+  <p>${p.stock === 0 ? `<span style="color:#c62828">Stok habis.</span>` : `Stok tersedia: ${p.stock ?? "—"}`}</p>
   <p>Dibuat dari bahan berbobot dengan potongan bersih dan detail minimal. Dirancang untuk dipakai berulang lintas musim.</p>
   <div class="sizes">${p.sizes.map(s => `<button class="${s === qvSize ? "on" : ""}" data-size="${s}">${s}</button>`).join("")}</div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-qadd="${p.id}">Add to bag ${icon("arrow")}</button><button class="btn ghost" data-wish="${p.id}">Wishlist</button><button class="btn ghost" data-share="${p.id}">Share ${icon("share")}</button></div></div>`;
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-qadd="${p.id}" ${p.stock === 0 ? "disabled" : ""}>${p.stock === 0 ? "Stok Habis" : `Add to bag ${icon("arrow")}`}</button><button class="btn ghost" data-wish="${p.id}">Wishlist</button><button class="btn ghost" data-share="${p.id}">Share ${icon("share")}</button></div></div>`;
   $("#qv").classList.add("open");
 }
 $("#q").addEventListener("input", e => {
@@ -530,7 +549,7 @@ document.addEventListener("click", e => {
   if (c("[data-logout]")) { try { localStorage.removeItem("sl_user"); } catch {} toast("Kamu sudah logout."); return openAccount(); }
   if (c("[data-wish]")) { e.stopPropagation(); const id = +c("[data-wish]").dataset.wish; toggleWish(id); if (wish.includes(id)) { const b = c("[data-wish]"); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); setTimeout(() => b.classList.remove("pop"), 550); floatHeart(e.clientX, e.clientY); } if ($("#wishPage").classList.contains("open")) renderWish(); return; }
   if (c("[data-wpx]")) { e.stopPropagation(); const id = +c("[data-wpx]").dataset.wpx, card = c("[data-wcard]"); floatHeart(e.clientX, e.clientY); card.classList.add("leaving"); setTimeout(() => { wish = wish.filter(w => w !== id); sync(); card.remove(); updateWishChrome(); const t = $("#wpGrid .wp-total"); if (!wish.length && t) t.remove(); }, 350); return; }
-  if (c("[data-wadd]")) { const b = c("[data-wadd]"), id = +b.dataset.wadd, p = PRODUCTS.find(x => x.id === id); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
+  if (c("[data-wadd]")) { const b = c("[data-wadd]"), id = +b.dataset.wadd, p = PRODUCTS.find(x => x.id === id); if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
   if (c("[data-share]")) { e.stopPropagation(); return shareProduct(+c("[data-share]").dataset.share); }
   if (c("[data-qv]")) { $("#search").classList.remove("open"); return openQV(+c("[data-qv]").dataset.qv); }
   if (c(".pimg") && c(".card")) return openQV(+c(".card").dataset.id);

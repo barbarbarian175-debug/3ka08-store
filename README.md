@@ -39,3 +39,21 @@ Endpoint:
 Catatan: login demo ini tanpa password — cocok untuk tugas, bukan untuk
 situs produksi. Pesanan & user yang dibuat saat mode offline tetap tersimpan
 di localStorage (`sl_orders`, `sl_user`).
+
+## Jualan beneran: stok, WhatsApp & admin
+
+- **Stok**: tiap produk punya stok (kolom `stock` di `products`, dibuat dari
+  `gen-db.js`). Stok berkurang otomatis saat pesanan dibuat; produk habis
+  tidak bisa dimasukkan ke Bag. Kalau database sudah pernah di-import,
+  jalankan migrasi ini sekali:
+  `ALTER TABLE products ADD COLUMN stock INT NOT NULL DEFAULT 10;`
+  `UPDATE products SET stock = 10 + (id % 7);`
+- **Konfirmasi via WhatsApp**: setelah checkout berhasil muncul tombol yang
+  membuka `wa.me` ke nomor penjual dengan isi pesanan lengkap. Nomornya
+  diatur di satu tempat di `solace.js`: `SELLER_WA` (format `628xx`) —
+  ganti dengan nomor WhatsApp asli toko.
+- **Halaman admin** (`admin.html`, hanya jalan di localhost): daftar semua
+  pesanan + ubah status (Diproses / Dikirim / Selesai / Dibatalkan) dan
+  tabel stok produk. Buka lewat Live Server: `http://localhost:5500/admin.html`.
+- **SEO**: meta description + Open Graph di `3ka08.html`, `favicon.svg`,
+  `sitemap.xml`, `robots.txt`.

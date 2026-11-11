@@ -59,6 +59,7 @@ function productRow($p) {
     "tag" => $p["tag"],
     "img" => $p["img"],
     "sizes" => explode(",", $p["sizes"]),
+    "stock" => (int) $p["stock"],
   ];
 }
 

@@ -11,6 +11,16 @@ define("FREE_SHIP_MIN", 750000);
 define("SHIP_COST", 15000);
 
 if ($_SERVER["REQUEST_METHOD"] === "GET") {
+  if (!empty($_GET["all"])) {
+    $st = $pdo->query("SELECT * FROM orders ORDER BY created_at DESC, id DESC");
+    $out = [];
+    foreach ($st->fetchAll() as $o) {
+      $it = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC");
+      $it->execute([$o["id"]]);
+      $out[] = orderRow($o, $it->fetchAll());
+    }
+    out(["ok" => true, "orders" => $out]);
+  }
   if (!empty($_GET["code"])) {
     $code = strtoupper(trim($_GET["code"]));
     $st = $pdo->prepare("SELECT * FROM orders WHERE id = ?");
@@ -34,6 +44,15 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
 if ($_SERVER["REQUEST_METHOD"] !== "POST") out(["ok" => false, "error" => "Method tidak didukung."], 405);
 
 $d = body();
+if (($d["action"] ?? "") === "update_status") {
+  $id = strtoupper(trim($d["id"] ?? ""));
+  $status = trim($d["status"] ?? "");
+  if (!in_array($status, ["Diproses", "Dikirim", "Selesai", "Dibatalkan"], true)) out(["ok" => false, "error" => "Status tidak dikenal."], 422);
+  $st = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
+  $st->execute([$status, $id]);
+  if ($st->rowCount() === 0) out(["ok" => false, "error" => "Nomor pesanan tidak ditemukan."], 404);
+  out(["ok" => true, "id" => $id, "status" => $status]);
+}
 $name = trim($d["name"] ?? "");
 $phone = preg_replace("/[\s-]/", "", trim($d["phone"] ?? ""));
 $city = trim($d["city"] ?? "");
@@ -95,6 +114,11 @@ try {
     $orderId, $userId, $name, $phone, $city, $addr, $note === "" ? null : $note, $pay,
     $promo === "" ? null : $promo, $subtotal, $discount, $shipping, $total,
   ]);
+  $dec = $pdo->prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?");
+  foreach ($cleanItems as $it) {
+    $dec->execute([$it["qty"], $it["id"], $it["qty"]]);
+    if ($dec->rowCount() === 0) throw new Exception("Stok " . $it["name"] . " tidak mencukupi.");
+  }
   $st = $pdo->prepare(
     "INSERT INTO order_items (order_id, product_id, product_name, size, price, qty) VALUES (?, ?, ?, ?, ?, ?)"
   );

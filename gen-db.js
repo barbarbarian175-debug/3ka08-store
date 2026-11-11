@@ -6,7 +6,7 @@ const path = require("path");
 
 const src = fs.readFileSync(path.join(__dirname, "solace.js"), "utf8");
 const start = src.indexOf("const PRODUCT_IMG");
-const end = src.indexOf("const PRODUCTS =");
+const end = src.indexOf("let PRODUCTS =");
 if (start < 0 || end < 0) throw new Error("data block not found");
 const dataSrc = src.slice(start, end);
 const sandbox = {};
@@ -31,11 +31,12 @@ const products = PRODUCT_ALL.map((img, i) => {
     tag: sale ? "SALE" : TAGS[i % 16 === i ? i : -1] || (i > 15 && i % 5 === 0 ? "NEW" : ""),
     img,
     sizes: id === 23 || id === 24 ? "One Size" : "S,M,L,XL",
+    stock: 10 + (id % 7),
   };
 });
 
 const rows = products
-  .map(p => `(${p.id}, '${esc(p.name)}', '${p.cat}', ${p.price}, ${p.oldPrice === null ? "NULL" : p.oldPrice}, '${esc(p.tag)}', '${esc(p.img)}', '${esc(p.sizes)}')`)
+  .map(p => `(${p.id}, '${esc(p.name)}', '${p.cat}', ${p.price}, ${p.oldPrice === null ? "NULL" : p.oldPrice}, '${esc(p.tag)}', '${esc(p.img)}', '${esc(p.sizes)}', ${p.stock})`)
   .join(",\n");
 
 const sql = `-- 3KA08 — Defined by Simplicity | database berta_store
@@ -56,6 +57,7 @@ CREATE TABLE IF NOT EXISTS products (
   tag VARCHAR(20) NOT NULL DEFAULT '',
   img VARCHAR(255) NOT NULL,
   sizes VARCHAR(50) NOT NULL DEFAULT 'S,M,L,XL',
+  stock INT NOT NULL DEFAULT 10,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -96,7 +98,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
-INSERT IGNORE INTO products (id, name, cat, price, old_price, tag, img, sizes) VALUES
+INSERT IGNORE INTO products (id, name, cat, price, old_price, tag, img, sizes, stock) VALUES
 ${rows};
 `;
 

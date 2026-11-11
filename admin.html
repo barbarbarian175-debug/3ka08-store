@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — 3KA08</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body{font-family:Inter,system-ui,Arial,sans-serif;background:#fafafa;color:#111;margin:0}
+  .admin{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+  .admin header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;border-bottom:1px solid #111;padding-bottom:16px}
+  .admin h1{font-size:28px;letter-spacing:4px;margin:0}
+  .admin h1 span{display:block;font-size:11px;letter-spacing:2px;color:#8a8a86;font-weight:400}
+  .admin a{color:#111}
+  .admin h2{font-size:15px;letter-spacing:2px;margin:36px 0 12px}
+  .admin .status{font-size:12px;color:#8a8a86;margin:14px 0}
+  .admin table{width:100%;border-collapse:collapse;background:#fff;font-size:13px}
+  .admin th,.admin td{border:1px solid #ddd;padding:9px 10px;text-align:left;vertical-align:top}
+  .admin th{background:#111;color:#fff;font-weight:600;letter-spacing:1px;font-size:11px;text-transform:uppercase}
+  .admin select{padding:5px 8px;border:1px solid #111;background:#fff;font:inherit;font-size:12px}
+  .admin .items{font-size:12px;color:#555;margin:4px 0 0;padding-left:16px}
+  .admin .low{color:#c62828;font-weight:700}
+  @media(max-width:700px){.admin table{font-size:12px}.admin th:nth-child(2),.admin td:nth-child(2){display:none}}
+</style>
+</head>
+<body>
+<div class="admin">
+  <header>
+    <h1>3KA08<span>ADMIN PANEL — DEFINED BY SIMPLICITY</span></h1>
+    <a href="3ka08.html">← Kembali ke Toko</a>
+  </header>
+  <p class="status" id="adminStatus">Memeriksa koneksi database…</p>
+
+  <h2>PESANAN</h2>
+  <table>
+    <thead><tr><th>Nomor</th><th>Tanggal</th><th>Pelanggan</th><th>Total</th><th>Status</th></tr></thead>
+    <tbody id="ordersBody"><tr><td colspan="5">Memuat…</td></tr></tbody>
+  </table>
+
+  <h2>PRODUK &amp; STOK</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Produk</th><th>Kategori</th><th>Harga</th><th>Stok</th></tr></thead>
+    <tbody id="stockBody"><tr><td colspan="5">Memuat…</td></tr></tbody>
+  </table>
+  <p class="status">Halaman ini hanya jalan di localhost (butuh Apache + MySQL XAMPP). Pesanan yang masuk lewat GitHub Pages tersimpan di browser pembeli — minta mereka konfirmasi via WhatsApp.</p>
+</div>
+<script>
+/* Admin 3KA08 — baca pesanan & stok dari API yang sama dengan toko (lihat api/). */
+const API_BASE = (() => {
+  const h = location.hostname;
+  return (h === "localhost" || h === "127.0.0.1" || h === "") ? "http://localhost/berta-api" : null;
+})();
+const rp = n => "Rp " + Number(n).toLocaleString("id-ID");
+const $ = s => document.querySelector(s);
+const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dibatalkan"];
+
+async function get(path) {
+  if (!API_BASE) throw new Error("API tidak aktif di host ini");
+  const r = await fetch(API_BASE + path);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
+  return d;
+}
+async function post(path, data) {
+  const r = await fetch(API_BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
+  return d;
+}
+function renderOrders(orders) {
+  $("#ordersBody").innerHTML = orders.length ? orders.map(o => `
+    <tr>
+      <td><b>${o.id}</b><ul class="items">${o.items.map(it => `<li>${it.qty}x produk #${it.id} (${it.size})</li>`).join("")}</ul></td>
+      <td>${(o.date || "").slice(0, 16).replace("T", " ")}</td>
+      <td>${o.name}<br><span style="color:#8a8a86">${o.phone} · ${o.city}</span></td>
+      <td>${rp(o.total)}<br><span style="color:#8a8a86">${o.pay}${o.promo ? " · " + o.promo : ""}</span></td>
+      <td><select data-order="${o.id}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+    </tr>`).join("") : '<tr><td colspan="5">Belum ada pesanan.</td></tr>';
+  document.querySelectorAll("[data-order]").forEach(sel => sel.addEventListener("change", async e => {
+    const id = e.target.dataset.order, status = e.target.value;
+    try { await post("/orders.php", { action: "update_status", id, status }); e.target.style.background = "#e8f5e9"; setTimeout(() => e.target.style.background = "", 800); }
+    catch (err) { alert("Gagal mengubah status: " + err.message); loadAll(); }
+  }));
+}
+function renderStock(products) {
+  $("#stockBody").innerHTML = products.map(p => `
+    <tr><td>${p.id}</td><td>${p.name}</td><td>${p.cat}</td><td>${rp(p.price)}</td>
+    <td class="${p.stock === 0 ? "low" : ""}">${p.stock === 0 ? "Habis" : p.stock}</td></tr>`).join("");
+}
+async function loadAll() {
+  try {
+    const [o, p] = await Promise.all([get("/orders.php?all=1"), get("/products.php")]);
+    $("#adminStatus").textContent = "● Terhubung ke database MySQL — " + o.orders.length + " pesanan, " + p.products.length + " produk.";
+    renderOrders(o.orders);
+    renderStock(p.products);
+  } catch (err) {
+    $("#adminStatus").textContent = "● API tidak terjangkau (" + err.message + ") — jalankan Apache & MySQL di XAMPP, lalu buka halaman ini dari localhost.";
+    $("#ordersBody").innerHTML = '<tr><td colspan="5">Tidak bisa memuat pesanan.</td></tr>';
+    $("#stockBody").innerHTML = '<tr><td colspan="5">Tidak bisa memuat produk.</td></tr>';
+  }
+}
+loadAll();
+</script>
+</body>
+</html>

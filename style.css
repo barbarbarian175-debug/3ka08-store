@@ -403,3 +403,7 @@ h2{font-weight:800;letter-spacing:-.03em;line-height:.95;text-transform:uppercas
 
 /* status koneksi API (database MySQL) di panel login */
 .api-status{font-size:11px;color:#8a8a86;text-align:center;margin:12px 0 0}
+
+/* label stok di kartu produk */
+.pinfo .stock{font-size:10px;letter-spacing:1px;color:#8a8a86;margin-left:8px}
+.pinfo .stock.out{color:#c62828}
