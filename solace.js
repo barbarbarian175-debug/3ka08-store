@@ -375,7 +375,7 @@ const INFO_CONTENT = {
   contact: ["Contact", `Hubungi kami di WhatsApp ${SELLER_WA_DISPLAY} atau email halo@3ka08.id. Jam layanan Senin–Sabtu, 09.00–18.00 WIB.`],
   support: ["Customer Service", `Ada kendala dengan pesananmu? Hubungi Customer Service di WhatsApp ${SELLER_WA_DISPLAY} atau email halo@3ka08.id. Sertakan nomor pesananmu supaya kami bisa bantu lebih cepat.`],
   shipping: ["Shipping & Returns", "Pengiriman 2–4 hari kerja, ongkir Rp15.000 dan gratis untuk belanja di atas Rp750.000. Penukaran atau pengembalian bisa dilakukan dalam 30 hari, selama produk belum dipakai dan tag masih terpasang."],
-  instagram: ["Instagram", "Follow 3KA08 di Instagram: @3ka08 — lihat lookbook terbaru, behind the scenes, dan info restock di sana."],
+  instagram: ["Instagram", "Follow 3KA08 di Instagram: @sisfor.ka08 — lihat lookbook terbaru, behind the scenes, dan info restock di sana. Buka instagram.com/sisfor.ka08."],
   tiktok: ["TikTok", "Follow 3KA08 di TikTok: @3ka08 — video styling, try-on, dan koleksi terbaru."],
   pinterest: ["Pinterest", "Follow 3KA08 di Pinterest: 3KA08 — kumpulan inspirasi outfit monokrom dan moodboard koleksi kami."]
 };
@@ -465,7 +465,7 @@ function openAccount() {
       <button class="lg-google" id="lgGoogle">${GOOGLE_G}<span>Masuk dengan Google</span></button>
       <p class="lg-signup" id="lgSignup">Belum punya akun? <button id="lgSignupLink">Daftar</button></p>
       <div class="lg-social">
-        <button data-info="instagram" aria-label="Instagram">${icon("instagram")}</button>
+        <a href="https://www.instagram.com/sisfor.ka08" target="_blank" rel="noopener" aria-label="Instagram">${icon("instagram")}</a>
         <button data-info="tiktok" aria-label="TikTok">${icon("tiktok")}</button>
         <button data-info="pinterest" aria-label="Pinterest">${icon("pinterest")}</button>
       </div></div>
