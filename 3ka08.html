@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3KA08 — Defined by Simplicity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="intro" aria-hidden="true"><div class="intro-logo"><span>3</span><span>K</span><span>A</span><span>0</span><span>8</span></div><small>Defined by Simplicity</small></div>
+<div class="ann"><span>Free shipping on selected orders</span><span>New collection available</span><span data-track style="cursor:pointer">Track your order</span></div>
+
+<header class="nav" id="nav">
+  <button class="ib" id="burger" aria-label="Menu" data-ic="menu"></button>
+  <nav class="links">
+    <a href="#products" data-mega="men" data-f="men">Men</a>
+    <a href="#products" data-mega="women" data-f="women">Women</a>
+    <a href="#categories" data-mega="collection" data-f="new">Collection</a>
+    <a href="#products" data-f="new">New Arrivals</a>
+    <a href="#products" data-f="sale">Sale</a>
+  </nav>
+  <a class="logo" href="#top">3KA08</a>
+  <div class="tools">
+    <button class="ib" id="searchBtn" aria-label="Search" data-ic="search"></button>
+    <button class="ib hide-s" id="accountBtn" aria-label="Account" data-ic="user"></button>
+    <button class="ib" id="wishBtn" aria-label="Wishlist"><i data-ic="heart"></i><b id="wishN">0</b></button>
+    <button class="ib" id="cartBtn" aria-label="Bag"><i data-ic="bag"></i><b id="cartN">0</b></button>
+  </div>
+  <div class="mega" id="mega"></div>
+</header>
+
+<aside class="mm" id="mm">
+  <button class="ib" id="mmClose" data-ic="x" aria-label="Close"></button>
+  <a href="#products" data-f="men">Men</a><a href="#products" data-f="women">Women</a><a href="#categories" data-f="new">Collection</a><a href="#products" data-f="new">New Arrivals</a><a href="#products" data-f="sale">Sale</a>
+</aside>
+
+<main id="top">
+<section class="hero">
+  <p class="hero-l">A considered wardrobe of tailored silhouettes, built from heavyweight fabrics and quiet detail.</p>
+  <p class="hero-r">Autumn / Winter<br>Collection 26</p>
+  <img class="hero-img" id="heroImg" alt="Model in 3KA08 collection" fetchpriority="high">
+  <h1 class="hero-h">3KA08</h1>
+  <div class="hero-cta">
+    <a class="btn" href="#products">Shop Collection <i data-ic="arrow"></i></a>
+    <a class="btn ghost" href="#products">Explore New Arrivals <i data-ic="arrow"></i></a>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true"><div class="marquee-t"><span>Defined by Simplicity&nbsp;&nbsp;•&nbsp;&nbsp;Autumn / Winter 26&nbsp;&nbsp;•&nbsp;&nbsp;New Collection&nbsp;&nbsp;•&nbsp;&nbsp;Free Shipping over Rp750.000&nbsp;&nbsp;•&nbsp;&nbsp;</span><span>Defined by Simplicity&nbsp;&nbsp;•&nbsp;&nbsp;Autumn / Winter 26&nbsp;&nbsp;•&nbsp;&nbsp;New Collection&nbsp;&nbsp;•&nbsp;&nbsp;Free Shipping over Rp750.000&nbsp;&nbsp;•&nbsp;&nbsp;</span></div></div>
+
+<section class="cats dark" id="categories">
+  <div class="cat-grid" id="catGrid"></div>
+</section>
+
+<section class="feat dark2">
+  <div class="feat-t rv">
+    <small>Featured Collection</small>
+    <h2>The Monochrome<br>Edit</h2>
+    <p>Eight pieces. One palette. A study in contrast, cut for movement and made to outlast the season.</p>
+    <a class="btn" href="#products">View Collection <i data-ic="arrow"></i></a>
+  </div>
+  <div class="feat-i clip"><img id="featImg" alt="Featured collection" loading="lazy"></div>
+</section>
+
+<section class="svc">
+  <div><i data-ic="truck"></i><h4>Fast Delivery</h4><p>2–4 working days</p></div>
+  <div><i data-ic="rotate"></i><h4>Easy Returns</h4><p>30 day window</p></div>
+  <div><i data-ic="award"></i><h4>Premium Quality</h4><p>Heavyweight fabrics</p></div>
+  <div><i data-ic="lock"></i><h4>Secure Payment</h4><p>Encrypted checkout</p></div>
+</section>
+
+<section class="prod" id="products">
+  <div class="prod-h rv"><h2>BEST SELLERS</h2>
+    <div class="filters" id="filters">
+      <button class="on" data-f="all">All</button><button data-f="men">Men</button><button data-f="women">Women</button>
+      <select id="sortSel" class="sort-sel" aria-label="Urutkan produk">
+        <option value="featured">Sort: Featured</option>
+        <option value="price-asc">Harga: Termurah</option>
+        <option value="price-desc">Harga: Termahal</option>
+        <option value="name-asc">Nama: A–Z</option>
+        <option value="newest">Terbaru</option>
+      </select>
+      <select id="priceSel" class="sort-sel" aria-label="Filter harga">
+        <option value="all">Harga: Semua</option>
+        <option value="lt500">Di bawah Rp500.000</option>
+        <option value="500-1000">Rp500.000 – Rp1.000.000</option>
+        <option value="gt1000">Di atas Rp1.000.000</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section class="promo dark2">
+  <div class="promo-h rv"><h2>New<br>Season</h2><div><small>Promotional</small><p>Potongan baru untuk musim ini, tampil dalam nada hitam, putih, dan abu.</p></div></div>
+  <div class="promo-g">
+    <div class="m clip"><img id="p0" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="p1" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="p2" alt="" loading="lazy"></div>
+  </div>
+</section>
+
+<section class="look">
+  <div class="promo-h rv"><h2>The<br>Lookbook</h2><small>Campaign 26</small></div>
+  <div class="look-g">
+    <div class="m clip"><img id="l1" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="l2" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="l3" alt="" loading="lazy"></div>
+  </div>
+</section>
+
+<section class="edit">
+  <div class="mosaic">
+    <div class="m clip w"><img id="m0" alt="Editorial campaign"></div>
+    <div class="m clip"><img id="m1" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="m2" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="m3" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="m4" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="m5" alt="" loading="lazy"></div>
+    <div class="m clip"><img id="l0" alt="" loading="lazy"></div>
+  </div>
+  <div class="edit-t rv">
+    <small>Campaign 26</small>
+    <h2>DEFINED<br>BY<br>SIMPLICITY</h2>
+    <p>We design less, on purpose. Every line is edited until only what matters remains — clothing that speaks quietly and lasts.</p>
+    <div class="edit-i2"><img id="editImg2" alt="" loading="lazy"></div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="foot-top">
+    <div><div class="logo f">3KA08</div><p>Minimal clothing for a considered life.</p></div>
+    <div><h5>Company</h5><a href="#" data-info="about">About Us</a><a href="#" data-info="contact">Contact</a></div>
+    <div><h5>Support</h5><a href="#" data-info="support">Customer Service</a><a href="#" data-info="shipping">Shipping &amp; Returns</a></div>
+    <div><h5>Social</h5><a href="#" data-info="instagram">Instagram</a><a href="#" data-info="tiktok">TikTok</a><a href="#" data-info="pinterest">Pinterest</a></div>
+    <form id="nl" novalidate><h5>Newsletter</h5><div class="nl-row"><input id="nlEmail" type="email" placeholder="Email address"><button class="ib" data-ic="arrow" aria-label="Subscribe"></button></div><small id="nlMsg"></small></form>
+  </div>
+  <div class="foot-b">© 2026 3KA08. All rights reserved.</div>
+</footer>
+
+<div class="ov" id="search"><button class="ib x" data-close data-ic="x" aria-label="Close"></button><input id="q" placeholder="Search products" autocomplete="off"><div class="res" id="res"></div></div>
+<div class="ov qv" id="qv"><button class="ib x" data-close data-ic="x" aria-label="Close"></button><div class="qv-box" id="qvBox"></div></div>
+<div class="ov co" id="co"><button class="ib x" data-close data-ic="x" aria-label="Close"></button><div class="co-box" id="coBox"></div></div>
+<div class="ov" id="info"><button class="ib x" data-close data-ic="x" aria-label="Close"></button><div class="info-box" id="infoBox"></div></div>
+<div class="ov" id="acct"><button class="ib x" data-close data-ic="x" aria-label="Close"></button><div id="acctBox"></div></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="dr-h"><h3 id="drT">Bag</h3><button class="ib" id="drClose" data-ic="x" aria-label="Close"></button></div>
+  <div class="dr-b" id="drB"></div>
+  <div class="dr-f" id="drF"></div>
+</aside>
+<div class="wish-page" id="wishPage" aria-hidden="true">
+  <div class="wp-inner">
+    <div class="wp-top">
+      <div>
+        <small>Saved items</small>
+        <h2>Wishlist <span id="wpCount"></span></h2>
+        <p class="wp-sub">Potongan yang kamu simpan. Tersimpan di browser ini, jadi bisa lanjut kapan saja.</p>
+      </div>
+      <button class="ib wp-close" id="wpClose" data-ic="x" aria-label="Tutup wishlist"></button>
+    </div>
+    <div class="wp-actions" id="wpActions">
+      <button class="btn" id="wpMoveAll">Pindahkan Semua ke Bag</button>
+      <button class="btn ghost" id="wpClear">Hapus Semua</button>
+    </div>
+    <div class="wp-grid" id="wpGrid"></div>
+    <div class="wp-empty" id="wpEmpty" hidden>
+      <div class="wp-heart" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.7 0-3 .5-4.5 2-1.5-1.5-2.8-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/></svg>
+        <i class="fh f1">♥</i><i class="fh f2">♥</i><i class="fh f3">♥</i>
+      </div>
+      <h3>Belum ada yang disimpan</h3>
+      <p>Ketuk ikon hati di produk yang kamu suka, nanti muncul di sini.</p>
+      <button class="btn" id="wpBrowse">Jelajahi Koleksi</button>
+    </div>
+  </div>
+</div>
+<div class="grain" aria-hidden="true"></div>
+<div class="toast" id="toast"></div>
+<script src="solace.js"></script>
+</body>
+</html>
