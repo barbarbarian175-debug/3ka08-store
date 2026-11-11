@@ -29,7 +29,7 @@ const NAMES = [
 /* Satu produk per link foto (37 produk). Ganti name / cat / price di sini sesuai baju aslinya.
    ID 23-24 = aksesoris (Topi, Syal). SALE_IDS = produk diskon, harga coret = harga awal. */
 const SALE_IDS = [3, 7, 12, 16, 21, 26, 31, 35];
-const PRODUCTS = PRODUCT_ALL.map((img, i) => {
+let PRODUCTS = PRODUCT_ALL.map((img, i) => {
   const id = i + 1, price = PRICES[i % PRICES.length], sale = SALE_IDS.includes(id);
   return {
   id,
@@ -80,6 +80,44 @@ let toastT; const toast = m => { const t = $("#toast"); t.textContent = m; t.cla
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 let cart = load("sl_cart", []), wish = load("sl_wish", []), filter = "all", sort = "featured", priceFilter = "all";
 const save = () => { try { localStorage.setItem("sl_cart", JSON.stringify(cart)); localStorage.setItem("sl_wish", JSON.stringify(wish)); } catch {} };
+
+/* ---------- API (back end PHP + MySQL, jalan di XAMPP) ----------
+   Kalau situs dibuka dari localhost (Live Server / file), frontend mencoba
+   ngobrol ke API di http://localhost/berta-api. Kalau API tidak terjangkau
+   (mis. situs GitHub Pages, atau XAMPP belum jalan), semua fitur tetap jalan
+   dengan data lokal + localStorage seperti sebelumnya. */
+const API_BASE = (() => {
+  const h = location.hostname;
+  return (h === "localhost" || h === "127.0.0.1" || h === "") ? "http://localhost/berta-api" : null;
+})();
+let apiOnline = false;
+const apiGet = async path => {
+  if (!API_BASE) throw new Error("API tidak aktif di host ini");
+  const r = await fetch(API_BASE + path);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
+  return d;
+};
+const apiPost = async (path, data) => {
+  if (!API_BASE) throw new Error("API tidak aktif di host ini");
+  const r = await fetch(API_BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
+  return d;
+};
+function setApiStatus() {
+  const el = $("#apiStatus");
+  if (el) el.textContent = apiOnline ? "● Terhubung ke database MySQL" : "● Mode offline — data tersimpan di browser ini";
+}
+async function apiLoadProducts() {
+  try {
+    const d = await apiGet("/products.php");
+    if (Array.isArray(d.products) && d.products.length) {
+      PRODUCTS = d.products.map(p => ({ ...p, colors: SWATCHES[(p.id - 1) % SWATCHES.length], alt: null }));
+      apiOnline = true; setApiStatus(); renderGrid();
+    }
+  } catch { apiOnline = false; setApiStatus(); }
+}
 
 /* ---------- STATIC IMAGES ---------- */
 $("#heroImg").src = MODEL_IMG[0];
@@ -268,7 +306,7 @@ function setFieldErr(id, msg) {
   f.querySelector(".err").textContent = msg || "";
   return !msg;
 }
-function submitCheckout() {
+async function submitCheckout() {
   const name = $("#coName").value.trim(), phone = $("#coPhone").value.trim().replace(/[\s-]/g, ""),
         city = $("#coCity").value.trim(), addr = $("#coAddr").value.trim(),
         note = $("#coNote").value.trim(), pay = document.querySelector('input[name="pay"]:checked').value;
@@ -278,8 +316,15 @@ function submitCheckout() {
   ok = setFieldErr("coCity", city.length < 3 ? "Isi kota kamu." : "") && ok;
   ok = setFieldErr("coAddr", addr.length < 10 ? "Isi alamat lengkap, minimal 10 karakter." : "") && ok;
   if (!ok) { $("#coMsg").textContent = "Cek lagi bagian yang ditandai merah."; return; }
-  const { subtotal, discount, shipping, total } = calcTotals();
-  const orderId = "3KA08-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + String(Date.now()).slice(-4);
+  let { subtotal, discount, shipping, total } = calcTotals();
+  let orderId = "3KA08-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + String(Date.now()).slice(-4);
+  try { /* simpan ke database lewat API; kalau gagal, tetap lanjut dengan penyimpanan lokal di bawah */
+    const u = getUser();
+    const res = await apiPost("/orders.php", { name, phone, city, addr, note, pay, promo: promo || null, user_email: u ? u.email : null, items: cart.map(c => ({ id: c.id, size: c.size, qty: c.qty })) });
+    orderId = res.order.id; subtotal = res.order.subtotal; discount = res.order.discount; shipping = res.order.shipping; total = res.order.total;
+    apiOnline = true;
+  } catch { apiOnline = false; }
+  setApiStatus();
   const order = { id: orderId, date: new Date().toISOString(), name, phone, city, addr, note, pay,
     items: cart.map(c => ({ id: c.id, size: c.size, qty: c.qty })), subtotal, discount, promo: promo || null, shipping, total };
   try {
@@ -383,6 +428,7 @@ function openAccount() {
       <div class="lg-body"><h2 id="lgTitle">Halo, ${u.name.split(" ")[0]}!</h2><p id="lgSub">Selamat datang kembali di 3KA08.</p>
       <p style="color:#555">${u.email}<br>Kamu punya ${orders.length} pesanan dan ${wish.length} item di wishlist.</p>
       ${last ? `<p style="color:#555">Pesanan terakhir: <b>${last.id}</b> — ${rp(last.total)}</p>` : "<p style=\"color:#555\">Belum ada pesanan. Yuk mulai belanja.</p>"}
+      <p class="api-status" id="apiStatus">Memeriksa koneksi database…</p>
       <button class="btn lg-submit" data-logout>Logout</button><button class="btn ghost lg-submit" data-close>Tutup</button></div>
     </div></div>`;
   } else {
@@ -396,6 +442,7 @@ function openAccount() {
         <div class="co-msg" id="acctMsg"></div>
         <button class="btn lg-submit" type="submit" id="lgSubmit">Masuk</button>
       </form>
+      <p class="api-status" id="apiStatus">Memeriksa koneksi database…</p>
       <div class="lg-or">atau</div>
       <button class="lg-google" id="lgGoogle">${GOOGLE_G}<span>Masuk dengan Google</span></button>
       <p class="lg-signup" id="lgSignup">Belum punya akun? <button id="lgSignupLink">Daftar</button></p>
@@ -405,12 +452,18 @@ function openAccount() {
         <button data-info="pinterest" aria-label="Pinterest">${icon("pinterest")}</button>
       </div></div>
     </div></div>`;
-    $("#acctForm").addEventListener("submit", e => {
+    $("#acctForm").addEventListener("submit", async e => {
       e.preventDefault();
       const name = $("#acctName").value.trim(), email = $("#acctEmail").value.trim();
       if (name.length < 3) { $("#acctMsg").textContent = "Isi nama kamu."; return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { $("#acctMsg").textContent = "Masukkan alamat email yang valid."; return; }
-      try { localStorage.setItem("sl_user", JSON.stringify({ name, email })); } catch {}
+      let user = { name, email };
+      try { /* simpan/ambil user dari database; kalau API mati, tetap login lokal seperti sebelumnya */
+        const res = await apiPost("/auth.php", { action: "login", name, email });
+        user = res.user; apiOnline = true;
+      } catch { apiOnline = false; }
+      setApiStatus();
+      try { localStorage.setItem("sl_user", JSON.stringify(user)); } catch {}
       toast("Halo, " + name + "!");
       openAccount();
     });
@@ -421,6 +474,7 @@ function openAccount() {
   const g = $("#lgGoogle"); if (g) g.onclick = () => toast("Login dengan Google belum tersedia — pakai nama & email di atas ya.");
   if (loginTimer) clearInterval(loginTimer);
   loginTimer = setInterval(loginTick, 5000);
+  setApiStatus();
   $("#acct").classList.add("open");
 }
 
@@ -433,12 +487,17 @@ function openTrack() {
     <button class="btn" type="submit">Lacak Pesanan ${icon("arrow")}</button>
   </form><div id="trackRes" style="margin-top:20px"></div>`;
   $("#info").classList.add("open");
-  $("#trackForm").addEventListener("submit", e => {
+  $("#trackForm").addEventListener("submit", async e => {
     e.preventDefault();
     const id = $("#trackId").value.trim().toUpperCase();
-    const order = load("sl_orders", []).find(o => o.id.toUpperCase() === id);
+    let order = null, fromApi = false;
+    try { /* cari dulu di database; kalau API mati, cari di localStorage seperti sebelumnya */
+      const res = await apiGet("/orders.php?code=" + encodeURIComponent(id));
+      order = res.order; fromApi = true; apiOnline = true;
+    } catch { apiOnline = false; }
+    if (!order) order = load("sl_orders", []).find(o => o.id.toUpperCase() === id);
     $("#trackRes").innerHTML = order
-      ? `<div class="ord" style="background:#fff;border:1px solid #bbb;padding:16px"><b>${order.id}</b><br>Status: <b>Diproses</b> — estimasi tiba 2–4 hari kerja.<br>Total: ${rp(order.total)} · ${order.pay}<br>Pengiriman ke ${order.city}</div>`
+      ? `<div class="ord" style="background:#fff;border:1px solid #bbb;padding:16px"><b>${order.id}</b><br>Status: <b>${order.status || "Diproses"}</b> — estimasi tiba 2–4 hari kerja.<br>Total: ${rp(order.total)} · ${order.pay}<br>Pengiriman ke ${order.city}${fromApi ? "<br><small>Data dari database MySQL</small>" : ""}</div>`
       : `<p style="color:#c62828">Nomor pesanan tidak ditemukan. Cek lagi nomor order kamu.</p>`;
   });
 }
@@ -566,4 +625,4 @@ const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecti
 $$(".rv, .clip").forEach((el, i) => { el.style.transitionDelay = (i % 4) * 90 + "ms"; io.observe(el); });
 
 NB_MODEL.forEach((src, i) => { const el = $(i < 3 ? "#p" + i : "#l" + (i - 3)); if (el) { el.src = src; el.onerror = () => el.removeAttribute("src"); } });
-hydrateIcons(); renderGrid(); sync();
+hydrateIcons(); renderGrid(); sync(); apiLoadProducts();

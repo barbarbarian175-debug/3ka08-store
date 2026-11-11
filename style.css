@@ -400,3 +400,6 @@ h2{font-weight:800;letter-spacing:-.03em;line-height:.95;text-transform:uppercas
 }
 
 .lg-google svg{stroke:none}
+
+/* status koneksi API (database MySQL) di panel login */
+.api-status{font-size:11px;color:#8a8a86;text-align:center;margin:12px 0 0}
