@@ -140,7 +140,7 @@ function renderGrid() {
   const h2 = document.querySelector(".prod-h h2");
   if (h2) h2.textContent = titles[filter] || "BEST SELLERS";
   $("#grid").innerHTML = list.map((p, i) => `
-    <article class="card${i % 9 === 0 ? " feat" : ""}" data-id="${p.id}">
+    <article class="card${i % 9 === 0 ? " wide" : ""}" data-id="${p.id}">
       <div class="pimg">${p.tag ? `<span class="tag">${p.tag}</span>` : ""}
         <button class="wish ${wish.includes(p.id) ? "on" : ""}" data-wish="${p.id}" aria-label="Wishlist">${icon("heart")}</button>
         ${imgTag(p.img, p.name)}${p.alt ? `<span class="alt">${imgTag(p.alt, "")}</span>` : ""}
