@@ -139,12 +139,12 @@ function renderGrid() {
   const titles = { all: "BEST SELLERS", men: "MEN", women: "WOMEN", acc: "ACCESSORIES", new: "NEW ARRIVALS", sale: "SALE" };
   const h2 = document.querySelector(".prod-h h2");
   if (h2) h2.textContent = titles[filter] || "BEST SELLERS";
-  $("#grid").innerHTML = list.map(p => `
-    <article class="card" data-id="${p.id}">
+  $("#grid").innerHTML = list.map((p, i) => `
+    <article class="card${i % 9 === 0 ? " feat" : ""}" data-id="${p.id}">
       <div class="pimg">${p.tag ? `<span class="tag">${p.tag}</span>` : ""}
         <button class="wish ${wish.includes(p.id) ? "on" : ""}" data-wish="${p.id}" aria-label="Wishlist">${icon("heart")}</button>
         ${imgTag(p.img, p.name)}${p.alt ? `<span class="alt">${imgTag(p.alt, "")}</span>` : ""}
-        <button class="qvb" data-qv="${p.id}">Quick View</button></div>
+        <div class="pact"><button data-qv="${p.id}">Quick View</button><button class="qab" data-qab="${p.id}"${p.stock === 0 ? " disabled" : ""}>${p.stock === 0 ? "Stok Habis" : "Add to Bag"}</button></div></div>
       <div class="pinfo"><div>${p.name}<div class="sw">${p.colors.map(c => `<i style="background:${c}"></i>`).join("")}</div></div><span>${p.oldPrice ? `<s>${rp(p.oldPrice)}</s> ` : ""}${rp(p.price)}</span>${p.stock === 0 ? `<span class="stock out">Habis</span>` : (p.stock ?? 99) <= 5 ? `<span class="stock low">Sisa ${p.stock}</span>` : ""}</div>
     </article>`).join("");
   $$(".pimg .alt").forEach(a => { a.style.cssText = "position:absolute;inset:0;opacity:0;transition:opacity .7s"; });
@@ -552,6 +552,8 @@ document.addEventListener("click", e => {
   if (c("[data-wadd]")) { const b = c("[data-wadd]"), id = +b.dataset.wadd, p = PRODUCTS.find(x => x.id === id); if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
   if (c("[data-share]")) { e.stopPropagation(); return shareProduct(+c("[data-share]").dataset.share); }
   if (c("[data-qv]")) { $("#search").classList.remove("open"); return openQV(+c("[data-qv]").dataset.qv); }
+  if (c("[data-qab]")) { e.stopPropagation(); const b = c("[data-qab]"), id = +b.dataset.qab, p = PRODUCTS.find(x => x.id === id); if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
+  if (c("[data-look]")) return openQV(+c("[data-look]").dataset.look);
   if (c(".pimg") && c(".card")) return openQV(+c(".card").dataset.id);
   if (c("[data-size]")) { qvSize = c("[data-size]").dataset.size; $$("[data-size]").forEach(b => b.classList.toggle("on", b === c("[data-size]"))); return; }
   if (c("[data-qadd]")) { $("#qv").classList.remove("open"); return addCart(+c("[data-qadd]").dataset.qadd, qvSize); }
@@ -644,4 +646,7 @@ const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecti
 $$(".rv, .clip").forEach((el, i) => { el.style.transitionDelay = (i % 4) * 90 + "ms"; io.observe(el); });
 
 NB_MODEL.forEach((src, i) => { const el = $(i < 3 ? "#p" + i : "#l" + (i - 3)); if (el) { el.src = src; el.onerror = () => el.removeAttribute("src"); } });
+/* Lookbook "Shop the Look": tiap tile mengarah ke satu produk, klik -> Quick View */
+const LOOKS = [5, 12, 20];
+LOOKS.forEach((pid, i) => { const tile = document.querySelectorAll(".look-g .m")[i]; const p = PRODUCTS.find(x => x.id === pid); if (!tile || !p) return; tile.dataset.look = pid; tile.insertAdjacentHTML("beforeend", `<span class="look-tag">${p.name} — ${rp(p.price)}</span>`); });
 hydrateIcons(); renderGrid(); sync(); apiLoadProducts();
