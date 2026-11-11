@@ -120,10 +120,77 @@ async function apiLoadProducts() {
   } catch { apiOnline = false; setApiStatus(); }
 }
 
+/* ---------- ULASAN & RATING ---------- */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ratingFor = p => 4 + ((p.id * 7) % 3) * 0.5;
+const reviewCountFor = p => 4 + ((p.id * 13) % 21);
+const stars = n => "★".repeat(Math.round(n)) + "☆".repeat(5 - Math.round(n));
+/* Ulasan contoh supaya halaman ulasan tidak kosong sebelum ada ulasan asli. */
+const REVIEW_SEED = [
+  { pid: 1, name: "Nadia", stars: 5, text: "Bahan linennya adem, cutting-nya rapi. Warnanya persis seperti di foto.", date: "8 Nov 2026" },
+  { pid: 2, name: "Raka", stars: 5, text: "Satinnya halus, nggak gampang kusut. Dipakai ke acara formal langsung ditanyain beli di mana.", date: "5 Nov 2026" },
+  { pid: 3, name: "Ilham", stars: 5, text: "Kaos heavyweight-nya beneran berat dan berkualitas, bukan yang tipis. Bakal repeat order.", date: "3 Okt 2026" },
+  { pid: 5, name: "Sinta", stars: 5, text: "Jaketnya tebal tapi nggak berat, resletingnya halus. Suka banget sama potongannya.", date: "2 Nov 2026" },
+  { pid: 5, name: "Dimas", stars: 4, text: "Bagus, cuma size L agak longgar di aku. Bahannya oke, pengiriman cepat.", date: "28 Okt 2026" },
+  { pid: 7, name: "Putri", stars: 5, text: "Celana chino-nya nyaman banget buat harian, warnanya nggak gampang pudar setelah dicuci.", date: "30 Okt 2026" },
+  { pid: 10, name: "Fajar", stars: 4, text: "Sweaternya hangat dan lembut, ukurannya true to size. Packing rapi.", date: "25 Okt 2026" },
+  { pid: 12, name: "Alya", stars: 5, text: "Dress-nya jatuh banget di badan, bahannya adem. Fix jadi favorit.", date: "22 Okt 2026" },
+  { pid: 15, name: "Bimo", stars: 5, text: "Celana denimnya kokoh, jahitannya rapi. Worth it di harga segini.", date: "18 Okt 2026" },
+  { pid: 20, name: "Kirana", stars: 5, text: "Atasan rajutnya lembut, nggak gatal sama sekali. Warnanya manis.", date: "15 Okt 2026" },
+  { pid: 27, name: "Reno", stars: 4, text: "Kaosnya tebal dan adem, sablonnya rapi. Pengiriman ke Bandung cuma 2 hari.", date: "10 Okt 2026" },
+  { pid: 31, name: "Maya", stars: 5, text: "Celana joggernya nyaman buat olahraga maupun santai. Kantongnya dalam.", date: "6 Okt 2026" }
+];
+let localReviews = load("sl_reviews", []);
+const apiReviews = {};
+const reviewsFor = pid => [...REVIEW_SEED.filter(r => r.pid === pid), ...localReviews.filter(r => r.pid === pid), ...(apiReviews[pid] || [])];
+function reviewsHTML(pid) {
+  const list = reviewsFor(pid);
+  if (!list.length) return '<p class="empty">Belum ada ulasan untuk produk ini. Jadilah yang pertama!</p>';
+  return list.map(r => `<div class="rvw"><div><b>${esc(r.name)}</b><span>${stars(r.stars)} · ${esc(r.date || "")}</span></div><p>${esc(r.text)}</p></div>`).join("");
+}
+async function loadApiReviews(pid) {
+  if (!API_BASE) return;
+  try {
+    const d = await apiGet(`/reviews.php?product_id=${pid}`);
+    if (Array.isArray(d.reviews)) {
+      apiReviews[pid] = d.reviews.map(r => ({ pid, name: r.name, stars: r.rating, text: r.text, date: new Date(r.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) }));
+      if (qvId === pid && $("#qvReviews")) $("#qvReviews").innerHTML = reviewsHTML(pid);
+    }
+  } catch {}
+}
+let rvStars = 5;
+function submitReview() {
+  const nameEl = $("#rvName"), textEl = $("#rvText");
+  const name = (nameEl.value || "").trim(), text = (textEl.value || "").trim();
+  if (!name || !text) return toast("Isi nama dan ulasanmu dulu ya.");
+  const rev = { pid: qvId, name, stars: rvStars, text, date: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) };
+  localReviews.push(rev); try { localStorage.setItem("sl_reviews", JSON.stringify(localReviews)); } catch {}
+  if (API_BASE) apiPost("/reviews.php", { product_id: qvId, name, rating: rvStars, text }).catch(() => {});
+  $("#qvReviews").innerHTML = reviewsHTML(qvId);
+  textEl.value = ""; toast("Terima kasih! Ulasanmu sudah terkirim.");
+}
+
 /* ---------- STATIC IMAGES ---------- */
 $("#heroImg").src = MODEL_IMG[0];
 $("#featImg").src = MODEL_IMG[5]; [6,8,9,10,11,12].forEach((n,i)=>{const el=$("#m"+i);el.src=MODEL_IMG[n];el.onerror=()=>el.removeAttribute("src");});$("#editImg2").src = MODEL_IMG[7];
 $("#catGrid").innerHTML = CATS.map(([n, i]) => `<a class="cat rv" href="#products" data-cat="${n}">${imgTag(MODEL_IMG[i], n)}<div>${n.toUpperCase()}${icon("arrow")}</div></a>`).join("");
+
+/* ---------- INSTAGRAM FEED ---------- */
+const IG_PICS = ["assets/model-02.jpg", "assets/model-05.jpg", "assets/model-08.jpg", "assets/model-11.jpg", "assets/model-14.jpg", "assets/model-17.jpg"];
+$("#igGrid").innerHTML = IG_PICS.map(s => `<a class="ig-t" href="https://www.instagram.com/sisfor.ka08" target="_blank" rel="noopener">${imgTag(s, "Instagram 3KA08")}<span>${icon("instagram")}</span></a>`).join("");
+
+/* ---------- FLASH SALE (berakhir Minggu 23:59) ---------- */
+function tickFlash() {
+  const el = $("#flashT"); if (!el) return;
+  const n = new Date(), end = new Date(n);
+  end.setDate(n.getDate() + ((7 - n.getDay()) % 7 || 7)); end.setHours(23, 59, 59, 999);
+  let ms = Math.max(0, end - n);
+  const d = Math.floor(ms / 86400000); ms -= d * 86400000;
+  const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000), s = Math.floor(ms % 60000 / 1000);
+  const p2 = x => String(x).padStart(2, "0");
+  el.textContent = d > 0 ? `${d} hari ${p2(h)}:${p2(m)}:${p2(s)}` : `${p2(h)}:${p2(m)}:${p2(s)}`;
+}
+tickFlash(); setInterval(tickFlash, 1000);
 $("#mega").innerHTML = Object.entries(MEGA).map(([k, cols]) => `<div class="mc" data-k="${k}" hidden style="display:flex;gap:80px">${cols.map(c => `<div><h5>${c[0]}</h5>${c.slice(1).map(l => { const f = l === "New Arrivals" ? "new" : l === "Sale" ? "sale" : l === "Best Sellers" ? "all" : ""; return `<a href="#products"${f ? ` data-f="${f}"` : ""}>${l}</a>`; }).join("")}</div>`).join("")}</div>`).join("");
 
 /* ---------- PRODUCTS ---------- */
@@ -145,7 +212,7 @@ function renderGrid() {
         <button class="wish ${wish.includes(p.id) ? "on" : ""}" data-wish="${p.id}" aria-label="Wishlist">${icon("heart")}</button>
         ${imgTag(p.img, p.name)}${p.alt ? `<span class="alt">${imgTag(p.alt, "")}</span>` : ""}
         <div class="pact"><button data-qv="${p.id}">Quick View</button><button class="qab" data-qab="${p.id}"${p.stock === 0 ? " disabled" : ""}>${p.stock === 0 ? "Stok Habis" : "Add to Bag"}</button></div></div>
-      <div class="pinfo"><div>${p.name}<div class="sw">${p.colors.map(c => `<i style="background:${c}"></i>`).join("")}</div></div><span>${p.oldPrice ? `<s>${rp(p.oldPrice)}</s> ` : ""}${rp(p.price)}</span>${p.stock === 0 ? `<span class="stock out">Habis</span>` : (p.stock ?? 99) <= 5 ? `<span class="stock low">Sisa ${p.stock}</span>` : ""}</div>
+      <div class="pinfo"><div>${p.name}<div class="sw">${p.colors.map(c => `<i style="background:${c}"></i>`).join("")}</div><div class="rate">★ ${ratingFor(p).toFixed(1)} · ${reviewCountFor(p)} ulasan</div></div><span>${p.oldPrice ? `<s>${rp(p.oldPrice)}</s> ` : ""}${rp(p.price)}</span>${p.stock === 0 ? `<span class="stock out">Habis</span>` : (p.stock ?? 99) <= 5 ? `<span class="stock low">Sisa ${p.stock}</span>` : ""}</div>
     </article>`).join("");
   $$(".pimg .alt").forEach(a => { a.style.cssText = "position:absolute;inset:0;opacity:0;transition:opacity .7s"; });
   $$(".card").forEach((c, i) => setTimeout(() => c.classList.add("show"), 80 + i * 90));
@@ -521,16 +588,25 @@ function openTrack() {
 }
 
 /* ---------- QUICK VIEW / SEARCH ---------- */
-let qvSize = null;
+let qvSize = null, qvId = null;
 function openQV(id) {
-  const p = PRODUCTS.find(x => x.id === id); qvSize = p.sizes[Math.min(1, p.sizes.length - 1)];
+  const p = PRODUCTS.find(x => x.id === id); qvId = id; qvSize = p.sizes[Math.min(1, p.sizes.length - 1)];
+  const rel = PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id).slice(0, 4);
+  const r = ratingFor(p), rc = reviewCountFor(p);
   $("#qvBox").innerHTML = `<div class="pimg">${imgTag(p.img, p.name, false)}</div>
   <div class="qv-i"><small>${p.cat === "acc" ? "Accessories" : p.cat}</small><h3>${p.name}</h3><b>${p.oldPrice ? `<s style="color:#8a8a86;font-weight:400">${rp(p.oldPrice)}</s> ` : ""}${rp(p.price)}</b>
+  <div class="qv-rate"><span class="st">${stars(r)}</span><b>${r.toFixed(1)}</b> · ${rc} ulasan</div>
   <p>${p.stock === 0 ? `<span style="color:#c62828">Stok habis.</span>` : `Stok tersedia: ${p.stock ?? "—"}`}</p>
   <p>Dibuat dari bahan berbobot dengan potongan bersih dan detail minimal. Dirancang untuk dipakai berulang lintas musim.</p>
   <div class="sizes">${p.sizes.map(s => `<button class="${s === qvSize ? "on" : ""}" data-size="${s}">${s}</button>`).join("")}</div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-qadd="${p.id}" ${p.stock === 0 ? "disabled" : ""}>${p.stock === 0 ? "Stok Habis" : `Add to bag ${icon("arrow")}`}</button><button class="btn ghost" data-wish="${p.id}">Wishlist</button><button class="btn ghost" data-share="${p.id}">Share ${icon("share")}</button></div></div>`;
+  ${p.sizes[0] === "One Size" ? "" : `<button class="sg-link" data-sg>Panduan ukuran</button>
+  <div class="sg-t" id="sgT" hidden><table><tr><th>Ukuran</th><th>Lingkar dada</th><th>Panjang</th><th>Bahu</th></tr><tr><td>S</td><td>96 cm</td><td>66 cm</td><td>42 cm</td></tr><tr><td>M</td><td>100 cm</td><td>68 cm</td><td>44 cm</td></tr><tr><td>L</td><td>104 cm</td><td>70 cm</td><td>46 cm</td></tr><tr><td>XL</td><td>108 cm</td><td>72 cm</td><td>48 cm</td></tr></table><small>Untuk celana &amp; rok, ukuran mengacu pada lingkar pinggang: S 76 cm, M 80 cm, L 84 cm, XL 88 cm.</small></div>`}
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-qadd="${p.id}" ${p.stock === 0 ? "disabled" : ""}>${p.stock === 0 ? "Stok Habis" : `Add to bag ${icon("arrow")}`}</button><button class="btn ghost" data-wish="${p.id}">Wishlist</button><button class="btn ghost" data-share="${p.id}">Share ${icon("share")}</button></div></div>
+  <div class="qv-x"><h4>Lengkapi gayamu</h4><div class="qv-rel">${rel.map(x => `<a data-qv="${x.id}"><div class="pimg">${imgTag(x.img, x.name)}</div><span>${x.name}</span><b>${rp(x.price)}</b></a>`).join("")}</div></div>
+  <div class="qv-x"><h4>Ulasan pembeli (${rc})</h4><div id="qvReviews">${reviewsHTML(p.id)}</div>
+  <div class="rv-form"><h5>Tulis ulasan</h5><input id="rvName" placeholder="Nama kamu" maxlength="60"><div class="rv-stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-rvstar="${n}" class="on">★</button>`).join("")}</div><textarea id="rvText" placeholder="Ceritakan pengalamanmu memakai produk ini..." rows="3" maxlength="500"></textarea><button class="btn" id="rvSubmit">Kirim Ulasan</button></div></div>`;
   $("#qv").classList.add("open");
+  loadApiReviews(p.id);
 }
 $("#q").addEventListener("input", e => {
   const v = e.target.value.trim().toLowerCase();
@@ -556,6 +632,9 @@ document.addEventListener("click", e => {
   if (c("[data-look]")) return openQV(+c("[data-look]").dataset.look);
   if (c(".pimg") && c(".card")) return openQV(+c(".card").dataset.id);
   if (c("[data-size]")) { qvSize = c("[data-size]").dataset.size; $$("[data-size]").forEach(b => b.classList.toggle("on", b === c("[data-size]"))); return; }
+  if (c("[data-sg]")) { const t = $("#sgT"); if (t) t.hidden = !t.hidden; return; }
+  if (c("[data-rvstar]")) { rvStars = +c("[data-rvstar]").dataset.rvstar; $$("[data-rvstar]").forEach(b => b.classList.toggle("on", +b.dataset.rvstar <= rvStars)); return; }
+  if (c("#rvSubmit")) return submitReview();
   if (c("[data-qadd]")) { $("#qv").classList.remove("open"); return addCart(+c("[data-qadd]").dataset.qadd, qvSize); }
   if (c("[data-add]")) return addCart(+c("[data-add]").dataset.add);
   if (c("[data-q]")) { const [i, d] = c("[data-q]").dataset.q.split(":"); cart[i].qty += +d; if (cart[i].qty < 1) cart.splice(i, 1); sync(); return openDrawer("cart"); }

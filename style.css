@@ -420,3 +420,47 @@ h2{font-weight:800;letter-spacing:-.03em;line-height:.95;text-transform:uppercas
 /* label stok di kartu produk */
 .pinfo .stock{font-size:10px;letter-spacing:1px;color:#8a8a86;margin-left:8px}
 .pinfo .stock.out{color:#c62828}
+
+/* ---------- Flash sale, IG feed, WA float, ulasan (2026-11-11) ---------- */
+.flash{background:#000;color:#fff;display:flex;justify-content:center;align-items:center;gap:18px;padding:13px 20px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;flex-wrap:wrap;text-align:center}
+.flash-tag{background:#fff;color:#000;padding:5px 10px;font-weight:800;letter-spacing:.16em}
+#flashT{font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:.08em}
+.flash a{color:#fff;border-bottom:1px solid #fff;padding-bottom:2px;white-space:nowrap}
+.ig{background:var(--bg);padding:90px 28px}
+.ig-g{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.ig-t{position:relative;aspect-ratio:1;overflow:hidden;background:#dcdbd7;display:block}
+.ig-t img{transition:transform 1.2s var(--e)}
+.ig-t:hover img{transform:scale(1.08)}
+.ig-t span{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.35);color:#fff;opacity:0;transition:opacity .4s}
+.ig-t:hover span{opacity:1}
+.ig-t span svg{width:28px;height:28px}
+.wa-float{position:fixed;right:20px;bottom:20px;z-index:60;width:56px;height:56px;border-radius:50%;background:#000;color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .3s var(--e)}
+.wa-float:hover{transform:scale(1.08)}
+.wa-float svg{width:26px;height:26px}
+.rate{font-size:11px;color:var(--g);margin-top:6px;letter-spacing:.02em}
+.qv-rate{font-size:13px;display:flex;align-items:center;gap:8px;letter-spacing:.02em}
+.qv-rate .st{letter-spacing:2px}
+.qv-x{grid-column:1/-1;margin-top:8px}
+.qv-x h4{font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 16px}
+.qv-rel{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.qv-rel a{font-size:12px;color:var(--ink)}
+.qv-rel .pimg{margin-bottom:8px}
+.qv-rel b{display:block;margin-top:4px;font-size:12px}
+.sg-link{font-size:12px;text-decoration:underline;text-underline-offset:3px;align-self:flex-start;padding:0}
+.sg-t{margin-top:4px}
+.sg-t table{width:100%;border-collapse:collapse;font-size:12px}
+.sg-t th,.sg-t td{border:1px solid var(--line);padding:8px 10px;text-align:left}
+.sg-t th{background:#f0efec;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.sg-t small{display:block;margin-top:8px;color:var(--g);font-size:11px;line-height:1.6}
+.rvw{border-top:1px solid var(--line);padding:14px 0}
+.rvw>div{display:flex;justify-content:space-between;gap:10px;font-size:12px;flex-wrap:wrap}
+.rvw p{font-size:13px;line-height:1.7;color:#555;margin-top:6px}
+.rv-form{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.rv-form h5{font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+.rv-form input,.rv-form textarea{border:1px solid #bbb;padding:12px;font:inherit;font-size:13px;outline:0;background:#fff;width:100%}
+.rv-form input:focus,.rv-form textarea:focus{border-color:#000}
+.rv-stars{display:flex;gap:4px}
+.rv-stars button{font-size:22px;line-height:1;color:#ccc;padding:2px}
+.rv-stars button.on{color:#000}
+@media (max-width:1000px){.ig-g{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:640px){.ig-g{grid-template-columns:repeat(2,1fr)}.qv-rel{grid-template-columns:repeat(2,1fr)}.wa-float{right:16px;bottom:16px;width:52px;height:52px}.ig{padding:60px 20px}}
