@@ -368,8 +368,8 @@ async function submitCheckout() {
 /* ---------- INFO / ACCOUNT / TRACK ORDER ---------- */
 /* Nomor WhatsApp penjual — GANTI dengan nomor asli toko.
    Dipakai tombol "Konfirmasi via WhatsApp" setelah checkout dan info kontak. */
-const SELLER_WA = "6281234567890";
-const SELLER_WA_DISPLAY = "0812-3456-7890";
+const SELLER_WA = "6282197712791";
+const SELLER_WA_DISPLAY = "0821-9771-2791";
 const INFO_CONTENT = {
   about: ["About Us", "3KA08 adalah brand fashion minimalis dari kelas 3KA08. Kami percaya pakaian yang baik tidak perlu ramai — potongan bersih, bahan berbobot, dan warna monokrom yang gampang dipadukan lintas musim."],
   contact: ["Contact", `Hubungi kami di WhatsApp ${SELLER_WA_DISPLAY} atau email halo@3ka08.id. Jam layanan Senin–Sabtu, 09.00–18.00 WIB.`],
