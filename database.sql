@@ -8,7 +8,7 @@ CREATE DATABASE IF NOT EXISTS berta_store CHARACTER SET utf8mb4 COLLATE utf8mb4_
 USE berta_store;
 
 CREATE TABLE IF NOT EXISTS products (
-  id INT PRIMARY KEY,
+  id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
   cat ENUM('men','women','acc') NOT NULL,
   price INT NOT NULL,

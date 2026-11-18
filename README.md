@@ -13,30 +13,40 @@ Dibangun dengan HTML, CSS, dan JavaScript murni — tanpa framework. Back end
 (PHP + MySQL, lihat bawah) bersifat opsional: tanpa XAMPP situs tetap jalan
 penuh dengan data lokal + localStorage.
 
-## Back end (PHP + MySQL, localhost via XAMPP)
+## Back end (PHP + MySQL, localhost via XAMPP atau `php -S`)
 
 Struktur: `database.sql` (skema + 37 produk), `api/` (REST API), `gen-db.js`
 (generator `database.sql` dari data produk di `solace.js`).
 
-1. Jalankan Apache & MySQL dari XAMPP Control Panel.
+1. Jalankan Apache & MySQL dari XAMPP Control Panel — atau dari folder
+   project ini jalankan `php -S localhost:8000` (butuh MySQL tetap jalan).
 2. Import `database.sql` lewat phpMyAdmin (tab Import) atau:
    `C:\xampp82\mysql\bin\mysql.exe -u root < database.sql`
-3. Buat symlink supaya Apache bisa melayani API dari folder ini:
-   `mklink /D C:\xampp82\htdocs\berta-api "C:\Users\X1\Desktop\Tugas Bu Berta\api"`
-   (jalankan Command Prompt sebagai Administrator; kalau gagal, copy saja
-   folder `api` ke `C:\xampp82\htdocs\berta-api`).
-4. Buka situs lewat Live Server / `localhost` (bukan GitHub Pages — Pages
-   hanya melayani file statis, jadi di sana situs otomatis pakai mode offline).
+3. Supaya API terjangkau, salah satu dari:
+   - Buka situs lewat `php -S localhost:8000` dari folder project (frontend
+     mencoba `api/` di samping situs dulu), atau
+   - Buat symlink supaya Apache bisa melayani API dari folder ini:
+     `mklink /D C:\xampp82\htdocs\berta-api "C:\Users\X1\Desktop\Tugas Bu Berta\api"`
+     (jalankan Command Prompt sebagai Administrator; kalau gagal, copy saja
+     folder `api` ke `C:\xampp82\htdocs\berta-api`).
+   Frontend mencoba kedua alamat itu berurutan dan memakai yang menjawab
+   JSON `{ok:true}`; kalau tidak ada yang terjangkau, situs otomatis pakai
+   mode offline (data lokal + localStorage).
+4. Buka situs lewat `localhost` (bukan GitHub Pages — Pages hanya melayani
+   file statis, jadi di sana situs otomatis pakai mode offline).
    Panel login menampilkan "● Terhubung ke database MySQL" kalau API terjangkau.
 
 Endpoint:
 
-- `GET /berta-api/products.php` — semua produk (atau `?id=3`)
-- `POST /berta-api/orders.php` — buat pesanan (total dihitung ulang server)
-- `GET /berta-api/orders.php?code=3KA08-...` — lacak pesanan
-- `POST /berta-api/auth.php` — login/demo (nama + email, tanpa password)
-- `GET /berta-api/reviews.php?product_id=5` — ulasan satu produk
-- `POST /berta-api/reviews.php` — kirim ulasan `{ product_id, name, rating (1-5), text }` (tabel `reviews`)
+- `GET /api/products.php` — semua produk (atau `?id=3`, `?cat=men`, `?q=jaket`)
+- `POST /api/products.php` — CRUD produk `{ action: "create" | "update" | "delete", ... }` (dipakai admin.html)
+- `POST /api/orders.php` — buat pesanan (total dihitung ulang server)
+- `GET /api/orders.php?code=3KA08-...` — lacak pesanan
+- `GET /api/orders.php?all=1` — semua pesanan (panel admin)
+- `POST /api/orders.php` — `{ action: "update_status" | "delete", id, ... }`
+- `POST /api/auth.php` — login/demo `{ action: "login", name, email }` dan daftar `{ action: "register", name, email }` (register menolak email yang sudah terdaftar, HTTP 409)
+- `GET /api/reviews.php?product_id=5` — ulasan satu produk
+- `POST /api/reviews.php` — kirim ulasan `{ product_id, name, rating (1-5), text }` (tabel `reviews`)
 
 Catatan: login demo ini tanpa password — cocok untuk tugas, bukan untuk
 situs produksi. Pesanan & user yang dibuat saat mode offline tetap tersimpan
@@ -74,7 +84,9 @@ di localStorage (`sl_orders`, `sl_user`).
   diatur di satu tempat di `solace.js`: `SELLER_WA` (format `628xx`) —
   ganti dengan nomor WhatsApp asli toko.
 - **Halaman admin** (`admin.html`, hanya jalan di localhost): daftar semua
-  pesanan + ubah status (Diproses / Dikirim / Selesai / Dibatalkan) dan
-  tabel stok produk. Buka lewat Live Server: `http://localhost:5500/admin.html`.
+  pesanan + ubah status (Diproses / Dikirim / Selesai / Dibatalkan) / hapus
+  pesanan, dan tabel stok produk + form tambah / edit / hapus produk.
+  Buka lewat Live Server: `http://localhost:5500/admin.html` atau
+  `http://localhost:8000/admin.html` (via `php -S`).
 - **SEO**: meta description + Open Graph di `3ka08.html`, `favicon.svg`,
   `sitemap.xml`, `robots.txt`.

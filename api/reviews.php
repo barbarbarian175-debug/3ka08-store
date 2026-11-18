@@ -30,4 +30,4 @@ $st->execute([$pid]);
 if (!$st->fetch()) out(["ok" => false, "error" => "Produk tidak ditemukan."], 404);
 $st = $pdo->prepare("INSERT INTO reviews (product_id, name, rating, text) VALUES (?, ?, ?, ?)");
 $st->execute([$pid, $name, $rating, $text]);
-out(["ok" => true, "id" => (int) $pdo->lastInsertId()]);
+out(["ok" => true, "id" => (int) $pdo->lastInsertId()], 201);

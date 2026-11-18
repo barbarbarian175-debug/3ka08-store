@@ -83,29 +83,51 @@ let cart = load("sl_cart", []), wish = load("sl_wish", []), filter = "all", sort
 const save = () => { try { localStorage.setItem("sl_cart", JSON.stringify(cart)); localStorage.setItem("sl_wish", JSON.stringify(wish)); } catch {} };
 
 /* ---------- API (back end PHP + MySQL, jalan di XAMPP) ----------
-   Kalau situs dibuka dari localhost (Live Server / file), frontend mencoba
-   ngobrol ke API di http://localhost/berta-api. Kalau API tidak terjangkau
-   (mis. situs GitHub Pages, atau XAMPP belum jalan), semua fitur tetap jalan
-   dengan data lokal + localStorage seperti sebelumnya. */
-const API_BASE = (() => {
+   Kalau situs dibuka dari localhost (Live Server / file / php -S), frontend
+   mencoba API dari folder api/ di samping situs dulu, lalu dari
+   http://localhost/berta-api (symlink XAMPP, lihat README). Kalau tidak ada
+   yang terjangkau (mis. GitHub Pages, atau XAMPP belum jalan), semua fitur
+   tetap jalan dengan data lokal + localStorage seperti sebelumnya.
+   apiFetch mencoba tiap kandidat sampai ada yang menjawab JSON {ok:true}.
+   Error 4xx dari server dianggap jawaban final (validasi) dan tidak dicoba
+   ke kandidat lain; error jaringan / respons bukan JSON lanjut ke kandidat
+   berikutnya. Error yang dilempar membawa .status (HTTP) supaya pemanggil
+   bisa membedakan "validasi gagal" (jangan simpan lokal) dengan "API mati"
+   (boleh fallback lokal). */
+const API_CANDIDATES = (() => {
   const h = location.hostname;
-  return (h === "localhost" || h === "127.0.0.1" || h === "") ? "http://localhost/berta-api" : null;
+  return (h === "localhost" || h === "127.0.0.1" || h === "") ? ["api", "http://localhost/berta-api"] : [];
 })();
+let apiBase = null; /* base yang terbukti menjawab JSON */
 let apiOnline = false;
-const apiGet = async path => {
-  if (!API_BASE) throw new Error("API tidak aktif di host ini");
-  const r = await fetch(API_BASE + path);
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
-  return d;
-};
-const apiPost = async (path, data) => {
-  if (!API_BASE) throw new Error("API tidak aktif di host ini");
-  const r = await fetch(API_BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
-  return d;
-};
+async function apiFetch(path, options) {
+  const bases = apiBase ? [apiBase] : API_CANDIDATES;
+  let lastErr = null;
+  for (const base of bases) {
+    try {
+      const r = await fetch(base.replace(/\/$/, "") + path, options);
+      const text = await r.text();
+      let d;
+      try { d = JSON.parse(text); } catch { throw new Error("Respons API bukan JSON."); }
+      if (!r.ok || d.ok !== true) {
+        const e = new Error(d.error || ("HTTP " + r.status));
+        e.status = r.status;
+        throw e;
+      }
+      apiBase = base; apiOnline = true; setApiStatus();
+      return d;
+    } catch (e) {
+      lastErr = e;
+      /* Validasi (4xx) sudah dijawab server: jangan coba base lain. */
+      if (e.status && e.status < 500) throw e;
+      /* Jaringan mati / bukan JSON / 5xx: coba kandidat berikutnya. */
+    }
+  }
+  apiOnline = false; setApiStatus();
+  throw lastErr || new Error("API tidak aktif di host ini");
+}
+const apiGet = path => apiFetch(path);
+const apiPost = (path, data) => apiFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 function setApiStatus() {
   const el = $("#apiStatus");
   if (el) el.textContent = apiOnline ? "● Terhubung ke database MySQL" : "● Mode offline — data tersimpan di browser ini";
@@ -115,6 +137,11 @@ async function apiLoadProducts() {
     const d = await apiGet("/products.php");
     if (Array.isArray(d.products) && d.products.length) {
       PRODUCTS = d.products.map(p => ({ ...p, colors: SWATCHES[(p.id - 1) % SWATCHES.length], alt: null }));
+      /* Bersihkan keranjang/wishlist dari id yang tidak ada di katalog server,
+         supaya drawer/checkout tidak crash membaca produk yang hilang. */
+      cart = cart.filter(c => PRODUCTS.some(p => p.id === c.id));
+      wish = wish.filter(id => PRODUCTS.some(p => p.id === id));
+      sync();
       apiOnline = true; setApiStatus(); renderGrid();
     }
   } catch { apiOnline = false; setApiStatus(); }
@@ -149,23 +176,29 @@ function reviewsHTML(pid) {
   return list.map(r => `<div class="rvw"><div><b>${esc(r.name)}</b><span>${stars(r.stars)} · ${esc(r.date || "")}</span></div><p>${esc(r.text)}</p></div>`).join("");
 }
 async function loadApiReviews(pid) {
-  if (!API_BASE) return;
+  if (!API_CANDIDATES.length) return;
   try {
     const d = await apiGet(`/reviews.php?product_id=${pid}`);
     if (Array.isArray(d.reviews)) {
-      apiReviews[pid] = d.reviews.map(r => ({ pid, name: r.name, stars: r.rating, text: r.text, date: new Date(r.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) }));
+      apiReviews[pid] = d.reviews.map(r => ({ pid, name: r.name, stars: r.rating, text: r.text, date: new Date(String(r.created_at).replace(" ", "T")).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) }));
       if (qvId === pid && $("#qvReviews")) $("#qvReviews").innerHTML = reviewsHTML(pid);
     }
   } catch {}
 }
 let rvStars = 5;
-function submitReview() {
+async function submitReview() {
   const nameEl = $("#rvName"), textEl = $("#rvText");
   const name = (nameEl.value || "").trim(), text = (textEl.value || "").trim();
   if (!name || !text) return toast("Isi nama dan ulasanmu dulu ya.");
+  /* Kirim ke server dulu: kalau server menolak (validasi 4xx), jangan simpan
+     lokal supaya ulasan yang ditolak tidak tampil seolah terkirim. Kalau API
+     mati (tanpa status HTTP), simpan lokal seperti sebelumnya. */
+  if (API_CANDIDATES.length) {
+    try { await apiPost("/reviews.php", { product_id: qvId, name, rating: rvStars, text }); }
+    catch (err) { if (err && err.status) return toast(err.message || "Ulasan tidak bisa dikirim."); }
+  }
   const rev = { pid: qvId, name, stars: rvStars, text, date: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) };
   localReviews.push(rev); try { localStorage.setItem("sl_reviews", JSON.stringify(localReviews)); } catch {}
-  if (API_BASE) apiPost("/reviews.php", { product_id: qvId, name, rating: rvStars, text }).catch(() => {});
   $("#qvReviews").innerHTML = reviewsHTML(qvId);
   textEl.value = ""; toast("Terima kasih! Ulasanmu sudah terkirim.");
 }
@@ -191,7 +224,7 @@ function tickFlash() {
   el.textContent = d > 0 ? `${d} hari ${p2(h)}:${p2(m)}:${p2(s)}` : `${p2(h)}:${p2(m)}:${p2(s)}`;
 }
 tickFlash(); setInterval(tickFlash, 1000);
-$("#mega").innerHTML = Object.entries(MEGA).map(([k, cols]) => `<div class="mc" data-k="${k}" hidden style="display:flex;gap:80px">${cols.map(c => `<div><h5>${c[0]}</h5>${c.slice(1).map(l => { const f = l === "New Arrivals" ? "new" : l === "Sale" ? "sale" : l === "Best Sellers" ? "all" : ""; return `<a href="#products"${f ? ` data-f="${f}"` : ""}>${l}</a>`; }).join("")}</div>`).join("")}</div>`).join("");
+$("#mega").innerHTML = Object.entries(MEGA).map(([k, cols]) => `<div class="mc" data-k="${k}" hidden>${cols.map(c => `<div><h5>${c[0]}</h5>${c.slice(1).map(l => { const f = l === "New Arrivals" ? "new" : l === "Sale" ? "sale" : l === "Best Sellers" ? "all" : ""; return `<a href="#products"${f ? ` data-f="${f}"` : ""}>${l}</a>`; }).join("")}</div>`).join("")}</div>`).join("");
 
 /* ---------- PRODUCTS ---------- */
 function renderGrid() {
@@ -236,7 +269,9 @@ function shareProduct(id) {
   toast("Membuka WhatsApp…");
 }
 function addCart(id, size) {
-  const p = PRODUCTS.find(x => x.id === id), s = size || p.sizes[1] || p.sizes[0];
+  const p = PRODUCTS.find(x => x.id === id);
+  if (!p) return toast("Produk tidak ditemukan.");
+  const s = size || p.sizes[1] || p.sizes[0];
   if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`);
   const ex = cart.find(c => c.id === id && c.size === s);
   ex ? ex.qty++ : cart.push({ id, size: s, qty: 1 });
@@ -247,11 +282,13 @@ function addCart(id, size) {
 function openDrawer(mode) {
   if (mode === "wish") return openWishlist();
   $("#drT").textContent = "Bag";
+  /* Buang item yang produknya tidak ada di katalog (mis. keranjang lama). */
+  cart = cart.filter(c => PRODUCTS.some(p => p.id === c.id));
   const body = $("#drB"), foot = $("#drF");
   body.innerHTML = cart.length ? cart.map((c, i) => { const p = PRODUCTS.find(x => x.id === c.id); return `
     <div class="li"><div class="pimg">${imgTag(p.img)}</div><div><h4>${p.name}</h4><span style="color:#8a8a86">Size ${c.size} · ${rp(p.price)}</span><br>
     <div class="qty"><button data-q="${i}:-1">−</button><span>${c.qty}</span><button data-q="${i}:1">+</button></div><button class="rm" data-rm="${i}">Remove</button></div></div>`; }).join("") : '<p class="empty">Bag kamu masih kosong.</p>';
-  const total = cart.reduce((a, c) => a + PRODUCTS.find(x => x.id === c.id).price * c.qty, 0);
+  const total = cart.reduce((a, c) => a + (PRODUCTS.find(x => x.id === c.id)?.price || 0) * c.qty, 0);
   foot.innerHTML = cart.length ? `<div class="tot"><span>Subtotal</span><b>${rp(total)}</b></div><button class="btn" id="checkout">Checkout</button>` : "";
   $("#drawer").dataset.mode = mode;
   $("#drawer").classList.add("open"); $("#scrim").classList.add("open");
@@ -287,7 +324,7 @@ const FREE_SHIP_MIN = 750000, SHIP_COST = 15000;
 const PROMOS = { "3KA08": 0.10 }; /* kode promo: diskon 10% */
 let promo = null;
 const calcTotals = () => {
-  const subtotal = cart.reduce((a, c) => a + PRODUCTS.find(x => x.id === c.id).price * c.qty, 0);
+  const subtotal = cart.reduce((a, c) => a + (PRODUCTS.find(x => x.id === c.id)?.price || 0) * c.qty, 0);
   const discount = promo ? Math.round(subtotal * PROMOS[promo]) : 0;
   const afterDisc = subtotal - discount;
   const shipping = cart.length === 0 ? 0 : (afterDisc >= FREE_SHIP_MIN ? 0 : SHIP_COST);
@@ -334,7 +371,7 @@ function openCheckout() {
   if (!cart.length) return toast("Bag kamu masih kosong.");
   closeDrawer();
   const { subtotal, shipping, total } = calcTotals();
-  const items = cart.map(c => { const p = PRODUCTS.find(x => x.id === c.id); return `
+  const items = cart.filter(c => PRODUCTS.some(p => p.id === c.id)).map(c => { const p = PRODUCTS.find(x => x.id === c.id); return `
     <div class="li"><div class="pimg">${imgTag(p.img)}</div><div><h4 style="margin:0">${p.name}</h4><span>Size ${c.size} · ${c.qty} × ${rp(p.price)}</span></div><b>${rp(p.price * c.qty)}</b></div>`; }).join("");
   $("#coBox").innerHTML = `
   <form id="coForm" novalidate>
@@ -393,8 +430,12 @@ async function submitCheckout() {
     orderId = res.order.id; subtotal = res.order.subtotal; discount = res.order.discount; shipping = res.order.shipping; total = res.order.total;
     apiOnline = true;
   } catch (err) {
+    /* Validasi server (4xx, mis. kode promo salah) dan stok habis: tampilkan
+       pesan dan BATALKAN — jangan simpan pesanan lokal seolah berhasil.
+       Error jaringan / API mati (tanpa status): fallback ke penyimpanan lokal. */
+    if (err && err.status && err.status < 500) { $("#coMsg").textContent = err.message || "Pesanan tidak bisa dibuat."; return; }
+    if (err && /Stok/i.test(err.message || "")) { $("#coMsg").textContent = err.message; return; }
     apiOnline = false;
-    if (err && /Stok/i.test(err.message || "")) { $("#coMsg").textContent = err.message; return; } /* stok habis di server: jangan simpan pesanan */
   }
   setApiStatus();
   const order = { id: orderId, date: new Date().toISOString(), name, phone, city, addr, note, pay,
@@ -461,11 +502,24 @@ const LOGIN_SLIDES = [
   { img: 1, tag: "New Collection", title: "Women" },
   { img: 2, tag: "New Collection", title: "Men" }
 ];
-let loginSlide = 0, loginLang = "id", loginTimer = null;
+let loginSlide = 0, loginLang = "id", loginTimer = null, loginMode = "login"; /* login | register */
 const LOGIN_I18N = {
-  id: { title: "Halo, selamat datang", sub: "Masuk ke 3KA08", name: "Nama kamu", email: "nama@email.com", submit: "Masuk", google: "Masuk dengan Google", signup: "Belum punya akun?", signupLink: "Daftar", lang: "ID" },
-  en: { title: "Hi, welcome back", sub: "Sign in to 3KA08", name: "Your name", email: "name@email.com", submit: "Sign in", google: "Sign in with Google", signup: "Don't have an account?", signupLink: "Sign up", lang: "EN" }
+  id: {
+    login: { title: "Halo, selamat datang", sub: "Masuk ke 3KA08", submit: "Masuk", signup: "Belum punya akun?", signupLink: "Daftar" },
+    register: { title: "Buat akun baru", sub: "Daftar ke 3KA08", submit: "Daftar", signup: "Sudah punya akun?", signupLink: "Masuk" },
+    name: "Nama kamu", email: "nama@email.com", google: "Masuk dengan Google", lang: "ID"
+  },
+  en: {
+    login: { title: "Hi, welcome back", sub: "Sign in to 3KA08", submit: "Sign in", signup: "Don't have an account?", signupLink: "Sign up" },
+    register: { title: "Create your account", sub: "Sign up for 3KA08", submit: "Sign up", signup: "Already have an account?", signupLink: "Sign in" },
+    name: "Your name", email: "name@email.com", google: "Sign in with Google", lang: "EN"
+  }
 };
+function setLoginMode(mode) {
+  loginMode = mode;
+  applyLoginLang();
+  const n = $("#acctName"); if (n) n.focus();
+}
 const GOOGLE_G = '<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.3h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.3-2.1 3.7-5.2 3.7-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.2 0-5.9-2.1-6.8-5.1L1.3 17.2C3.3 21.2 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.2 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.3 6.8C.5 8.4 0 10.1 0 12s.5 3.6 1.3 5.2l3.9-2.9z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1.1 15.2 0 12 0 7.3 0 3.3 2.8 1.3 6.8l3.9 2.9c.9-2.9 3.6-5 6.8-5z"/></svg>';
 function loginLeftHTML() {
   const s = LOGIN_SLIDES[loginSlide];
@@ -493,14 +547,14 @@ function loginTick() {
   loginGo(1);
 }
 function applyLoginLang() {
-  const t = LOGIN_I18N[loginLang];
+  const t = LOGIN_I18N[loginLang], m = t[loginMode];
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   set("#lgLang", t.lang + " ▾");
   if (getUser()) return; /* kalau sudah login, sapaan personal jangan ditimpa */
-  set("#lgTitle", t.title); set("#lgSub", t.sub); set("#lgSubmit", t.submit); set("#lgGoogle span", t.google);
+  set("#lgTitle", m.title); set("#lgSub", m.sub); set("#lgSubmit", m.submit); set("#lgGoogle span", t.google);
   const n = $("#acctName"), e = $("#acctEmail");
   if (n) n.placeholder = t.name; if (e) e.placeholder = t.email;
-  const su = $("#lgSignup"); if (su) su.innerHTML = `${t.signup} <button id="lgSignupLink">${t.signupLink}</button>`;
+  const su = $("#lgSignup"); if (su) su.innerHTML = `${m.signup} <button id="lgSignupLink" type="button">${m.signupLink}</button>`;
 }
 function openAccount() {
   const u = getUser();
@@ -544,10 +598,16 @@ function openAccount() {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { $("#acctMsg").textContent = "Masukkan alamat email yang valid."; return; }
       let user = { name, email };
       try { /* simpan/ambil user dari database; kalau API mati, tetap login lokal seperti sebelumnya */
-        const res = await apiPost("/auth.php", { action: "login", name, email });
+        const res = await apiPost("/auth.php", { action: loginMode, name, email });
         user = res.user; apiOnline = true;
-      } catch { apiOnline = false; }
+      } catch (err) {
+        /* Server menolak (mis. daftar dengan email yang sudah terdaftar):
+           tampilkan pesannya, jangan login lokal seolah berhasil. */
+        if (err && err.status) { $("#acctMsg").textContent = err.message || "Tidak bisa masuk."; return; }
+        apiOnline = false;
+      }
       setApiStatus();
+      loginMode = "login";
       try { localStorage.setItem("sl_user", JSON.stringify(user)); } catch {}
       toast("Halo, " + name + "!");
       openAccount();
@@ -559,6 +619,7 @@ function openAccount() {
   const g = $("#lgGoogle"); if (g) g.onclick = () => toast("Login dengan Google belum tersedia — pakai nama & email di atas ya.");
   if (loginTimer) clearInterval(loginTimer);
   loginTimer = setInterval(loginTick, 5000);
+  applyLoginLang();
   setApiStatus();
   $("#acct").classList.add("open");
 }
@@ -579,7 +640,7 @@ function openTrack() {
     try { /* cari dulu di database; kalau API mati, cari di localStorage seperti sebelumnya */
       const res = await apiGet("/orders.php?code=" + encodeURIComponent(id));
       order = res.order; fromApi = true; apiOnline = true;
-    } catch { apiOnline = false; }
+    } catch (err) { if (!err.status) apiOnline = false; /* 404 = nomor tidak ada, bukan API mati */ }
     if (!order) order = load("sl_orders", []).find(o => o.id.toUpperCase() === id);
     $("#trackRes").innerHTML = order
       ? `<div class="ord" style="background:#fff;border:1px solid #bbb;padding:16px"><b>${order.id}</b><br>Status: <b>${order.status || "Diproses"}</b> — estimasi tiba 2–4 hari kerja.<br>Total: ${rp(order.total)} · ${order.pay}<br>Pengiriman ke ${order.city}${fromApi ? "<br><small>Data dari database MySQL</small>" : ""}</div>`
@@ -590,7 +651,9 @@ function openTrack() {
 /* ---------- QUICK VIEW / SEARCH ---------- */
 let qvSize = null, qvId = null;
 function openQV(id) {
-  const p = PRODUCTS.find(x => x.id === id); qvId = id; qvSize = p.sizes[Math.min(1, p.sizes.length - 1)];
+  const p = PRODUCTS.find(x => x.id === id);
+  if (!p) return toast("Produk tidak ditemukan.");
+  qvId = id; qvSize = p.sizes[Math.min(1, p.sizes.length - 1)];
   const rel = PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id).slice(0, 4);
   const r = ratingFor(p), rc = reviewCountFor(p);
   $("#qvBox").innerHTML = `<div class="pimg">${imgTag(p.img, p.name, false)}</div>
@@ -619,16 +682,16 @@ document.addEventListener("click", e => {
   const t = e.target, c = s => t.closest(s);
   if (c("[data-info]")) { e.preventDefault(); return openInfo(c("[data-info]").dataset.info); }
   if (c("[data-focus-form]")) { const n = $("#acctName"); if (n) n.focus(); return; }
-  if (c("#lgSignupLink")) { const n = $("#acctName"); if (n) n.focus(); return; }
+  if (c("#lgSignupLink")) { setLoginMode(loginMode === "login" ? "register" : "login"); return; }
   if (c("[data-track]")) return openTrack();
   if (c("#accountBtn")) return openAccount();
   if (c("[data-logout]")) { try { localStorage.removeItem("sl_user"); } catch {} toast("Kamu sudah logout."); return openAccount(); }
   if (c("[data-wish]")) { e.stopPropagation(); const id = +c("[data-wish]").dataset.wish; toggleWish(id); if (wish.includes(id)) { const b = c("[data-wish]"); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); setTimeout(() => b.classList.remove("pop"), 550); floatHeart(e.clientX, e.clientY); } if ($("#wishPage").classList.contains("open")) renderWish(); return; }
   if (c("[data-wpx]")) { e.stopPropagation(); const id = +c("[data-wpx]").dataset.wpx, card = c("[data-wcard]"); floatHeart(e.clientX, e.clientY); card.classList.add("leaving"); setTimeout(() => { wish = wish.filter(w => w !== id); sync(); card.remove(); updateWishChrome(); const t = $("#wpGrid .wp-total"); if (!wish.length && t) t.remove(); }, 350); return; }
-  if (c("[data-wadd]")) { const b = c("[data-wadd]"), id = +b.dataset.wadd, p = PRODUCTS.find(x => x.id === id); if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
+  if (c("[data-wadd]")) { const b = c("[data-wadd]"), id = +b.dataset.wadd, p = PRODUCTS.find(x => x.id === id); if (!p) return; if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
   if (c("[data-share]")) { e.stopPropagation(); return shareProduct(+c("[data-share]").dataset.share); }
   if (c("[data-qv]")) { $("#search").classList.remove("open"); return openQV(+c("[data-qv]").dataset.qv); }
-  if (c("[data-qab]")) { e.stopPropagation(); const b = c("[data-qab]"), id = +b.dataset.qab, p = PRODUCTS.find(x => x.id === id); if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
+  if (c("[data-qab]")) { e.stopPropagation(); const b = c("[data-qab]"), id = +b.dataset.qab, p = PRODUCTS.find(x => x.id === id); if (!p) return; if ((p.stock ?? 1) <= 0) return toast(`Maaf, ${p.name} sedang habis.`); const ex = cart.find(x => x.id === id && x.size === (p.sizes[1] || p.sizes[0])); ex ? ex.qty++ : cart.push({ id, size: p.sizes[1] || p.sizes[0], qty: 1 }); sync(); b.textContent = "Ditambahkan ✓"; b.disabled = true; setTimeout(() => { b.textContent = "Add to Bag"; b.disabled = false; }, 1400); const cb = $("#cartBtn"); cb.classList.remove("bump"); void cb.offsetWidth; cb.classList.add("bump"); return; }
   if (c("[data-look]")) return openQV(+c("[data-look]").dataset.look);
   if (c(".pimg") && c(".card")) return openQV(+c(".card").dataset.id);
   if (c("[data-size]")) { qvSize = c("[data-size]").dataset.size; $$("[data-size]").forEach(b => b.classList.toggle("on", b === c("[data-size]"))); return; }
@@ -637,7 +700,7 @@ document.addEventListener("click", e => {
   if (c("#rvSubmit")) return submitReview();
   if (c("[data-qadd]")) { $("#qv").classList.remove("open"); return addCart(+c("[data-qadd]").dataset.qadd, qvSize); }
   if (c("[data-add]")) return addCart(+c("[data-add]").dataset.add);
-  if (c("[data-q]")) { const [i, d] = c("[data-q]").dataset.q.split(":"); cart[i].qty += +d; if (cart[i].qty < 1) cart.splice(i, 1); sync(); return openDrawer("cart"); }
+  if (c("[data-q]")) { const [i, d] = c("[data-q]").dataset.q.split(":"); if (!cart[i]) return; cart[i].qty += +d; if (cart[i].qty < 1) cart.splice(i, 1); sync(); return openDrawer("cart"); }
   if (c("[data-rm]")) { cart.splice(+c("[data-rm]").dataset.rm, 1); sync(); return openDrawer("cart"); }
   if (c("#checkout")) return openCheckout();
   if (c("#promoApply")) return applyPromo();

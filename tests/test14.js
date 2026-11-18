@@ -2,10 +2,12 @@
    tombol WA melayang, feed Instagram.
    Jalankan: timeout 60 node tests/test14.js */
 const fs = require('fs');
+const path = require('path');
 const { JSDOM } = require('jsdom');
-const dir = '/home/hatch/workspace/berta-work';
+const dir = path.join(__dirname, '..');
 const html = fs.readFileSync(dir + '/3ka08.html', 'utf8');
 const js = fs.readFileSync(dir + '/solace.js', 'utf8');
+const aboutJs = fs.readFileSync(dir + '/about-page.js', 'utf8');
 const css = fs.readFileSync(dir + '/style.css', 'utf8');
 const tick = (ms = 50) => new Promise(r => setTimeout(r, ms));
 
@@ -17,18 +19,30 @@ const dom = new JSDOM(html, { url: 'http://localhost:5500/3ka08.html', runScript
     w.fetch = async (u) => {
       const s = String(u);
       if (s.includes('reviews.php')) {
-        if (s.includes('product_id=5')) return { ok: true, json: async () => ({ ok: true, reviews: [{ id: 99, product_id: 5, name: 'API User', rating: 5, text: 'Ulasan dari database.', created_at: '2026-11-11 15:00:00' }] }) };
-        return { ok: true, json: async () => ({ ok: true, reviews: [] }) };
+        const body = s.includes('product_id=5')
+          ? { ok: true, reviews: [{ id: 99, product_id: 5, name: 'API User', rating: 5, text: 'Ulasan dari database.', created_at: '2026-11-11 15:00:00' }] }
+          : { ok: true, reviews: [] };
+        /* solace.js membaca respons lewat .text() lalu JSON.parse */
+        return { ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body };
       }
       throw new Error('API mati');
     };
   } });
 const { window } = dom, doc = window.document;
-const click = el => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, clientX: 100, clientY: 100 }));
+const click = el => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, clientX: 100, clientY: 100 }));
 
 (async () => {
+  // 0. About page dimuat di 3ka08.html (dulu tidak: about-page.js/css tidak
+  //    pernah di-include, jadi link "About Us" hanya membuka popup info).
+  console.log('about css dimuat:', html.includes('about-page.css'), '| about js dimuat:', html.includes('about-page.js'));
   window.eval(js);
+  window.eval(aboutJs);
   await tick(150);
+  const aboutLink = doc.querySelector('[data-info="about"]');
+  click(aboutLink); await tick(100);
+  console.log('about terbuka:', doc.querySelector('#aboutPage').classList.contains('open'), '| hash #about:', window.location.hash === '#about');
+  click(doc.querySelector('#abClose')); await tick(100);
+  console.log('about tertutup (Esc/close):', !doc.querySelector('#aboutPage').classList.contains('open'));
 
   // 1. Flash sale
   const ft = doc.querySelector('#flashT').textContent;

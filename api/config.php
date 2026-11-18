@@ -2,6 +2,19 @@
 /* 3KA08 API — config & helpers. Dijalankan di XAMPP (Apache + MySQL).
    Database: berta_store (lihat database.sql di folder utama). */
 ini_set("display_errors", "0"); /* API mengembalikan JSON — jangan biarkan warning PHP merusak respons */
+/* Polyfill mbstring: XAMPP mengaktifkannya secara default, tapi php-cli
+   minimal (mis. php -S di Linux) sering tidak punya. Tanpa ini, mb_strlen()
+   di reviews.php/products.php fatal 500. */
+if (!function_exists("mb_strlen")) {
+  function mb_strlen($s, $enc = null) { return preg_match_all("/./us", (string) $s); }
+}
+if (!function_exists("mb_substr")) {
+  function mb_substr($s, $start, $len = null, $enc = null) {
+    $chars = preg_split("//u", (string) $s, -1, PREG_SPLIT_NO_EMPTY);
+    if ($len === null) $len = count($chars) - $start;
+    return implode("", array_slice($chars, $start, $len));
+  }
+}
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");

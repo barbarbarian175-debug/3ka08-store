@@ -2,7 +2,10 @@
 /* API pesanan.
    GET  /api/orders.php?code=3KA08-20261111-1234  -> lacak satu pesanan
    GET  /api/orders.php?email=a@b.com             -> semua pesanan satu email
+   GET  /api/orders.php?all=1                     -> semua pesanan (panel admin)
    POST /api/orders.php  { name, phone, city, addr, note?, pay, promo?, user_email?, items: [{id, size, qty}] }
+   POST /api/orders.php  { action: "update_status", id, status }
+   POST /api/orders.php  { action: "delete", id }
    Total dihitung ulang di server dari harga di database — bukan dari angka
    yang dikirim frontend — supaya tidak bisa dimanipulasi. */
 require __DIR__ . "/config.php";
@@ -45,21 +48,30 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") out(["ok" => false, "error" => "Metho
 
 $d = body();
 if (($d["action"] ?? "") === "update_status") {
-  $id = strtoupper(trim($d["id"] ?? ""));
-  $status = trim($d["status"] ?? "");
+  $id = strtoupper(trim((string) ($d["id"] ?? "")));
+  $status = trim((string) ($d["status"] ?? ""));
   if (!in_array($status, ["Diproses", "Dikirim", "Selesai", "Dibatalkan"], true)) out(["ok" => false, "error" => "Status tidak dikenal."], 422);
   $st = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
   $st->execute([$status, $id]);
   if ($st->rowCount() === 0) out(["ok" => false, "error" => "Nomor pesanan tidak ditemukan."], 404);
   out(["ok" => true, "id" => $id, "status" => $status]);
 }
-$name = trim($d["name"] ?? "");
-$phone = preg_replace("/[\s-]/", "", trim($d["phone"] ?? ""));
-$city = trim($d["city"] ?? "");
-$addr = trim($d["addr"] ?? "");
-$note = trim($d["note"] ?? "");
+if (($d["action"] ?? "") === "delete") {
+  $id = strtoupper(trim((string) ($d["id"] ?? "")));
+  if ($id === "") out(["ok" => false, "error" => "Nomor pesanan tidak valid."], 422);
+  $st = $pdo->prepare("DELETE FROM orders WHERE id = ?");
+  $st->execute([$id]);
+  if ($st->rowCount() === 0) out(["ok" => false, "error" => "Nomor pesanan tidak ditemukan."], 404);
+  out(["ok" => true, "id" => $id]);
+}
+if (!empty($d["action"])) out(["ok" => false, "error" => "Action tidak dikenal."], 400);
+$name = trim((string) ($d["name"] ?? ""));
+$phone = preg_replace("/[\s-]/", "", trim((string) ($d["phone"] ?? "")));
+$city = trim((string) ($d["city"] ?? ""));
+$addr = trim((string) ($d["addr"] ?? ""));
+$note = trim((string) ($d["note"] ?? ""));
 $pay = $d["pay"] ?? "";
-$promo = strtoupper(trim($d["promo"] ?? ""));
+$promo = strtoupper(trim((string) ($d["promo"] ?? "")));
 $items = $d["items"] ?? [];
 
 if (strlen($name) < 3) out(["ok" => false, "error" => "Isi nama lengkap kamu."], 422);
@@ -81,11 +93,14 @@ foreach ($st->fetchAll() as $p) $byId[(int) $p["id"]] = $p;
 $subtotal = 0;
 $cleanItems = [];
 foreach ($items as $it) {
+  if (!is_array($it)) out(["ok" => false, "error" => "Format item pesanan tidak valid."], 422);
   $pid = (int) ($it["id"] ?? 0);
-  $qty = max(1, (int) ($it["qty"] ?? 1));
+  $qty = (int) ($it["qty"] ?? 0);
+  if ($qty < 1 || $qty > 99) out(["ok" => false, "error" => "Jumlah tiap produk harus 1–99."], 422);
   if (!isset($byId[$pid])) out(["ok" => false, "error" => "Produk #$pid tidak ditemukan."], 422);
   $p = $byId[$pid];
-  $size = in_array($it["size"] ?? "", explode(",", $p["sizes"]), true) ? $it["size"] : explode(",", $p["sizes"])[0];
+  $size = (string) ($it["size"] ?? "");
+  if (!in_array($size, explode(",", $p["sizes"]), true)) out(["ok" => false, "error" => "Ukuran \"$size\" tidak tersedia untuk " . $p["name"] . "."], 422);
   $subtotal += (int) $p["price"] * $qty;
   $cleanItems[] = ["id" => $pid, "name" => $p["name"], "size" => $size, "price" => (int) $p["price"], "qty" => $qty];
 }
@@ -98,7 +113,7 @@ $total = $afterDisc + $shipping;
 $userId = null;
 if (!empty($d["user_email"])) {
   $st = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-  $st->execute([trim($d["user_email"])]);
+  $st->execute([trim((string) $d["user_email"])]);
   $u = $st->fetch();
   if ($u) $userId = (int) $u["id"];
 }

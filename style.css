@@ -24,6 +24,8 @@ h2{font-weight:800;letter-spacing:-.03em;line-height:.95;text-transform:uppercas
 .ib b{font-size:10px;font-weight:700;min-width:14px}
 .mega{position:absolute;left:0;right:0;top:100%;background:#f6f5f2;border-top:1px solid var(--line);padding:36px 28px 44px 92px;display:flex;gap:80px;opacity:0;visibility:hidden;transform:translateY(-8px);transition:.4s var(--e)}
 .mega.open{opacity:1;visibility:visible;transform:none}
+.mega .mc{display:flex;gap:80px}
+.mega .mc[hidden]{display:none}
 .mega h5{font-size:10px;letter-spacing:.2em;color:var(--g);text-transform:uppercase;margin-bottom:16px;font-weight:500}
 .mega a{display:block;font-size:15px;padding:5px 0;transition:transform .3s var(--e)}
 .mega a:hover{transform:translateX(6px)}
@@ -419,6 +421,7 @@ h2{font-weight:800;letter-spacing:-.03em;line-height:.95;text-transform:uppercas
 
 /* label stok di kartu produk */
 .pinfo .stock{font-size:10px;letter-spacing:1px;color:#8a8a86;margin-left:8px}
+.pinfo .stock.low{color:#c62828;font-weight:700}
 .pinfo .stock.out{color:#c62828}
 
 /* ---------- Flash sale, IG feed, WA float, ulasan (2026-11-11) ---------- */

@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Admin — 3KA08</title>
 <link rel="stylesheet" href="style.css">
 <style>
@@ -17,10 +18,21 @@
   .admin table{width:100%;border-collapse:collapse;background:#fff;font-size:13px}
   .admin th,.admin td{border:1px solid #ddd;padding:9px 10px;text-align:left;vertical-align:top}
   .admin th{background:#111;color:#fff;font-weight:600;letter-spacing:1px;font-size:11px;text-transform:uppercase}
-  .admin select{padding:5px 8px;border:1px solid #111;background:#fff;font:inherit;font-size:12px}
+  .admin select,.admin input{padding:5px 8px;border:1px solid #111;background:#fff;font:inherit;font-size:12px}
   .admin .items{font-size:12px;color:#555;margin:4px 0 0;padding-left:16px}
   .admin .low{color:#c62828;font-weight:700}
-  @media(max-width:700px){.admin table{font-size:12px}.admin th:nth-child(2),.admin td:nth-child(2){display:none}}
+  .admin .btn-sm{padding:5px 10px;border:1px solid #111;background:#fff;font-size:12px;cursor:pointer}
+  .admin .btn-sm:hover{background:#111;color:#fff}
+  .admin .btn-sm.danger{border-color:#c62828;color:#c62828}
+  .admin .btn-sm.danger:hover{background:#c62828;color:#fff}
+  .admin .btn-sm:disabled{opacity:.5;cursor:default}
+  .admin form.prod-form{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;background:#fff;border:1px solid #ddd;padding:16px;margin-top:8px}
+  .admin form.prod-form label{display:flex;flex-direction:column;gap:4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#555}
+  .admin form.prod-form input,.admin form.prod-form select{width:100%;padding:9px 10px;font-size:13px}
+  .admin form.prod-form .full{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .admin form.prod-form .full .msg{font-size:12px;color:#c62828}
+  .admin form.prod-form .full .msg.ok{color:#2e7d32}
+  @media(max-width:700px){.admin table{font-size:12px}.admin th:nth-child(2),.admin td:nth-child(2){display:none}.admin form.prod-form{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -33,72 +45,165 @@
 
   <h2>PESANAN</h2>
   <table>
-    <thead><tr><th>Nomor</th><th>Tanggal</th><th>Pelanggan</th><th>Total</th><th>Status</th></tr></thead>
-    <tbody id="ordersBody"><tr><td colspan="5">Memuat…</td></tr></tbody>
+    <thead><tr><th>Nomor</th><th>Tanggal</th><th>Pelanggan</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead>
+    <tbody id="ordersBody"><tr><td colspan="6">Memuat…</td></tr></tbody>
   </table>
 
   <h2>PRODUK &amp; STOK</h2>
-  <table>
-    <thead><tr><th>ID</th><th>Produk</th><th>Kategori</th><th>Harga</th><th>Stok</th></tr></thead>
-    <tbody id="stockBody"><tr><td colspan="5">Memuat…</td></tr></tbody>
+  <form class="prod-form" id="prodForm">
+    <input type="hidden" id="pfId" value="">
+    <label>Nama produk<input id="pfName" placeholder="Contoh: Kemeja Linen Hitam" maxlength="120" required></label>
+    <label>Kategori
+      <select id="pfCat"><option value="men">Men</option><option value="women">Women</option><option value="acc">Accessories</option></select>
+    </label>
+    <label>Harga (Rp)<input id="pfPrice" type="number" min="1" step="1000" placeholder="689000" required></label>
+    <label>Stok<input id="pfStock" type="number" min="0" step="1" placeholder="10" required></label>
+    <label>Harga coret (opsional)<input id="pfOldPrice" type="number" min="0" step="1000" placeholder="Kosongkan kalau tidak diskon"></label>
+    <label>Tag<input id="pfTag" placeholder="NEW / SALE / BEST SELLER" maxlength="20"></label>
+    <label>Ukuran (pisah koma)<input id="pfSizes" placeholder="S,M,L,XL atau One Size" value="S,M,L,XL"></label>
+    <label>Gambar<input id="pfImg" placeholder="assets/product-01.jpg" value="assets/product-01.jpg"></label>
+    <div class="full">
+      <button class="btn-sm" type="submit" id="pfSubmit">+ Tambah Produk</button>
+      <button class="btn-sm" type="button" id="pfCancel" hidden>Batal Edit</button>
+      <span class="msg" id="pfMsg"></span>
+    </div>
+  </form>
+  <table style="margin-top:16px">
+    <thead><tr><th>ID</th><th>Produk</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Aksi</th></tr></thead>
+    <tbody id="stockBody"><tr><td colspan="6">Memuat…</td></tr></tbody>
   </table>
-  <p class="status">Halaman ini hanya jalan di localhost (butuh Apache + MySQL XAMPP). Pesanan yang masuk lewat GitHub Pages tersimpan di browser pembeli — minta mereka konfirmasi via WhatsApp.</p>
+  <p class="status">Halaman ini hanya jalan di localhost (butuh Apache + MySQL XAMPP, atau <code>php -S localhost:8000</code> dari folder project). API dicoba dulu dari folder <code>api/</code> di samping halaman ini, lalu dari <code>http://localhost/berta-api</code>. Pesanan yang masuk lewat GitHub Pages tersimpan di browser pembeli — minta mereka konfirmasi via WhatsApp.</p>
 </div>
 <script>
-/* Admin 3KA08 — baca pesanan & stok dari API yang sama dengan toko (lihat api/). */
-const API_BASE = (() => {
-  const h = location.hostname;
-  return (h === "localhost" || h === "127.0.0.1" || h === "") ? "http://localhost/berta-api" : null;
-})();
+/* Admin 3KA08 — baca pesanan & stok dari API yang sama dengan toko (lihat api/).
+   API dicoba dari folder api/ lokal dulu (php -S / XAMPP dengan project di
+   htdocs), lalu dari http://localhost/berta-api (symlink XAMPP, lihat README).
+   Respons yang bukan JSON {ok:true} dianggap gagal dan dicoba ke base berikut. */
+const API_CANDIDATES = ["api", "http://localhost/berta-api"];
+let apiBase = null;
 const rp = n => "Rp " + Number(n).toLocaleString("id-ID");
 const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dibatalkan"];
 
-async function get(path) {
-  if (!API_BASE) throw new Error("API tidak aktif di host ini");
-  const r = await fetch(API_BASE + path);
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
-  return d;
+async function apiFetch(path, options) {
+  const bases = apiBase ? [apiBase] : API_CANDIDATES;
+  let lastErr = null;
+  for (const base of bases) {
+    try {
+      const r = await fetch(base.replace(/\/$/, "") + path, options);
+      const text = await r.text();
+      let d;
+      try { d = JSON.parse(text); } catch { throw new Error("Respons API bukan JSON."); }
+      if (!r.ok || d.ok !== true) { const e = new Error(d.error || ("HTTP " + r.status)); e.status = r.status; throw e; }
+      apiBase = base;
+      return d;
+    } catch (e) {
+      lastErr = e;
+      if (e.status && e.status < 500) throw e; /* validasi server: jawaban final */
+    }
+  }
+  throw lastErr || new Error("API tidak aktif di host ini");
 }
-async function post(path, data) {
-  const r = await fetch(API_BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.ok === false) throw new Error(d.error || ("HTTP " + r.status));
-  return d;
-}
+const get = path => apiFetch(path);
+const post = (path, data) => apiFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+
 function renderOrders(orders) {
   $("#ordersBody").innerHTML = orders.length ? orders.map(o => `
     <tr>
-      <td><b>${o.id}</b><ul class="items">${o.items.map(it => `<li>${it.qty}x produk #${it.id} (${it.size})</li>`).join("")}</ul></td>
-      <td>${(o.date || "").slice(0, 16).replace("T", " ")}</td>
-      <td>${o.name}<br><span style="color:#8a8a86">${o.phone} · ${o.city}</span></td>
-      <td>${rp(o.total)}<br><span style="color:#8a8a86">${o.pay}${o.promo ? " · " + o.promo : ""}</span></td>
-      <td><select data-order="${o.id}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-    </tr>`).join("") : '<tr><td colspan="5">Belum ada pesanan.</td></tr>';
+      <td><b>${esc(o.id)}</b><ul class="items">${(o.items || []).map(it => `<li>${it.qty}x produk #${it.id} (${esc(it.size)})</li>`).join("")}</ul></td>
+      <td>${esc((o.date || "").slice(0, 16).replace("T", " "))}</td>
+      <td>${esc(o.name)}<br><span style="color:#8a8a86">${esc(o.phone)} · ${esc(o.city)}</span></td>
+      <td>${rp(o.total)}<br><span style="color:#8a8a86">${esc(o.pay)}${o.promo ? " · " + esc(o.promo) : ""}</span></td>
+      <td><select data-order="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></td>
+      <td><button class="btn-sm danger" data-delorder="${esc(o.id)}">Hapus</button></td>
+    </tr>`).join("") : '<tr><td colspan="6">Belum ada pesanan.</td></tr>';
   document.querySelectorAll("[data-order]").forEach(sel => sel.addEventListener("change", async e => {
     const id = e.target.dataset.order, status = e.target.value;
     try { await post("/orders.php", { action: "update_status", id, status }); e.target.style.background = "#e8f5e9"; setTimeout(() => e.target.style.background = "", 800); }
     catch (err) { alert("Gagal mengubah status: " + err.message); loadAll(); }
   }));
+  document.querySelectorAll("[data-delorder]").forEach(btn => btn.addEventListener("click", async e => {
+    const id = e.target.dataset.delorder;
+    if (!confirm("Hapus pesanan " + id + "? Item pesanannya ikut terhapus.")) return;
+    try { await post("/orders.php", { action: "delete", id }); loadAll(); }
+    catch (err) { alert("Gagal menghapus pesanan: " + err.message); }
+  }));
 }
 function renderStock(products) {
-  $("#stockBody").innerHTML = products.map(p => `
-    <tr><td>${p.id}</td><td>${p.name}</td><td>${p.cat}</td><td>${rp(p.price)}</td>
-    <td class="${p.stock === 0 ? "low" : ""}">${p.stock === 0 ? "Habis" : p.stock}</td></tr>`).join("");
+  $("#stockBody").innerHTML = products.length ? products.map(p => `
+    <tr><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td>${rp(p.price)}</td>
+    <td class="${p.stock === 0 ? "low" : ""}">${p.stock === 0 ? "Habis" : p.stock}</td>
+    <td><button class="btn-sm" data-editprod="${p.id}">Edit</button> <button class="btn-sm danger" data-delprod="${p.id}">Hapus</button></td></tr>`).join("")
+    : '<tr><td colspan="6">Belum ada produk.</td></tr>';
+  document.querySelectorAll("[data-editprod]").forEach(btn => btn.addEventListener("click", () => {
+    const p = products.find(x => x.id === +btn.dataset.editprod);
+    if (!p) return;
+    $("#pfId").value = p.id;
+    $("#pfName").value = p.name; $("#pfCat").value = p.cat;
+    $("#pfPrice").value = p.price; $("#pfOldPrice").value = p.oldPrice ?? "";
+    $("#pfTag").value = p.tag || ""; $("#pfSizes").value = (p.sizes || []).join(",");
+    $("#pfStock").value = p.stock; $("#pfImg").value = p.img || "";
+    $("#pfSubmit").textContent = "Simpan Perubahan";
+    $("#pfCancel").hidden = false;
+    $("#pfMsg").textContent = "";
+    $("#prodForm").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#pfName").focus();
+  }));
+  document.querySelectorAll("[data-delprod]").forEach(btn => btn.addEventListener("click", async () => {
+    const p = products.find(x => x.id === +btn.dataset.delprod);
+    if (!p || !confirm("Hapus produk #" + p.id + " — " + p.name + "? Ulasannya ikut terhapus, tapi pesanan lama tetap tersimpan.")) return;
+    try { await post("/products.php", { action: "delete", id: p.id }); loadAll(); }
+    catch (err) { alert("Gagal menghapus produk: " + err.message); }
+  }));
+}
+function resetProdForm() {
+  $("#prodForm").reset();
+  $("#pfId").value = "";
+  $("#pfSizes").value = "S,M,L,XL"; $("#pfImg").value = "assets/product-01.jpg";
+  $("#pfSubmit").textContent = "+ Tambah Produk";
+  $("#pfCancel").hidden = true;
+  $("#pfMsg").textContent = "";
 }
 async function loadAll() {
   try {
     const [o, p] = await Promise.all([get("/orders.php?all=1"), get("/products.php")]);
-    $("#adminStatus").textContent = "● Terhubung ke database MySQL — " + o.orders.length + " pesanan, " + p.products.length + " produk.";
+    $("#adminStatus").textContent = "● Terhubung ke database MySQL (" + apiBase + ") — " + o.orders.length + " pesanan, " + p.products.length + " produk.";
     renderOrders(o.orders);
     renderStock(p.products);
   } catch (err) {
-    $("#adminStatus").textContent = "● API tidak terjangkau (" + err.message + ") — jalankan Apache & MySQL di XAMPP, lalu buka halaman ini dari localhost.";
-    $("#ordersBody").innerHTML = '<tr><td colspan="5">Tidak bisa memuat pesanan.</td></tr>';
-    $("#stockBody").innerHTML = '<tr><td colspan="5">Tidak bisa memuat produk.</td></tr>';
+    $("#adminStatus").textContent = "● API tidak terjangkau (" + err.message + ") — jalankan Apache & MySQL di XAMPP (atau php -S dari folder project), lalu buka halaman ini dari localhost.";
+    $("#ordersBody").innerHTML = '<tr><td colspan="6">Tidak bisa memuat pesanan.</td></tr>';
+    $("#stockBody").innerHTML = '<tr><td colspan="6">Tidak bisa memuat produk.</td></tr>';
   }
 }
+$("#prodForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const msg = $("#pfMsg");
+  const name = $("#pfName").value.trim();
+  const price = Number($("#pfPrice").value), stock = Number($("#pfStock").value);
+  const oldPrice = $("#pfOldPrice").value === "" ? null : Number($("#pfOldPrice").value);
+  if (name.length < 3) { msg.textContent = "Isi nama produk (minimal 3 karakter)."; return; }
+  if (!price || price <= 0) { msg.textContent = "Isi harga yang valid."; return; }
+  if (!Number.isInteger(stock) || stock < 0) { msg.textContent = "Isi stok 0 atau lebih."; return; }
+  const id = $("#pfId").value;
+  const payload = {
+    action: id ? "update" : "create",
+    name, cat: $("#pfCat").value, price, old_price: oldPrice,
+    tag: $("#pfTag").value.trim(), sizes: $("#pfSizes").value.trim(), stock,
+    img: $("#pfImg").value.trim() || "assets/product-01.jpg",
+  };
+  if (id) payload.id = +id;
+  msg.textContent = "Menyimpan…"; msg.classList.remove("ok");
+  try {
+    await post("/products.php", payload);
+    resetProdForm();
+    msg.textContent = id ? "Produk berhasil diubah." : "Produk berhasil ditambahkan.";
+    msg.classList.add("ok");
+    loadAll();
+  } catch (err) { msg.textContent = "Gagal menyimpan: " + err.message; msg.classList.remove("ok"); }
+});
+$("#pfCancel").addEventListener("click", resetProdForm);
 loadAll();
 </script>
 </body>
